@@ -1,0 +1,98 @@
+[2026-06-16 22:22:31] === server started ===
+[2026-06-16 22:22:31] maze generated (20x20)
+[2026-06-16 22:22:31] listening on port 8080
+[2026-06-16 22:23:07] new connection from 127.0.0.1:59244
+[2026-06-16 22:23:13] REGISTER nick=mario from 127.0.0.1
+[2026-06-16 22:23:13] LOGIN nick=mario from 127.0.0.1
+[2026-06-16 22:23:23] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:23:33] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:23:43] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:23:53] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:24:03] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:24:13] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:24:15] COLLECT nick=mario score=1 pos=(2,15)
+[2026-06-16 22:24:20] COLLECT nick=mario score=2 pos=(4,15)
+[2026-06-16 22:24:23] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:24:23] COLLECT nick=mario score=3 pos=(5,14)
+[2026-06-16 22:24:33] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:24:36] new connection from 127.0.0.1:42710
+[2026-06-16 22:24:42] REGISTER nick=luca from 127.0.0.1
+[2026-06-16 22:24:42] LOGIN nick=luca from 127.0.0.1
+[2026-06-16 22:24:43] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:24:52] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:24:53] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:25:02] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:25:03] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:25:12] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:25:13] COLLECT nick=mario score=4 pos=(7,14)
+[2026-06-16 22:25:13] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:25:22] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:25:23] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:25:32] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:25:33] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:25:42] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:25:43] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:25:50] EXIT nick=luca score=0
+[2026-06-16 22:25:50] GAME_END nick=luca msg=GAME_END WIN luca 0
+[2026-06-16 22:25:50] DISCONNECT nick=luca
+[2026-06-16 22:25:53] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:26:03] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:26:13] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:26:23] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:26:33] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:26:42] EXIT nick=mario score=4
+[2026-06-16 22:26:42] GAME_END nick=mario msg=GAME_END WIN mario 4
+[2026-06-16 22:26:42] DISCONNECT nick=mario
+[2026-06-16 22:27:37] === server started ===
+[2026-06-16 22:27:37] maze generated (20x20)
+[2026-06-16 22:27:37] listening on port 12345
+[2026-06-16 22:27:59] new connection from 127.0.0.1:55918
+[2026-06-16 22:28:04] LOGIN nick=mario from 127.0.0.1
+[2026-06-16 22:28:14] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:28:19] new connection from 127.0.0.1:40412
+[2026-06-16 22:28:23] new connection from 127.0.0.1:46950
+[2026-06-16 22:28:24] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:28:32] new connection from 127.0.0.1:53478
+[2026-06-16 22:28:34] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:28:35] LOGIN nick=luca from 127.0.0.1
+[2026-06-16 22:28:44] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:28:45] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:28:54] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:28:55] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:29:04] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:29:05] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:29:11] COLLECT nick=mario score=1 pos=(8,2)
+[2026-06-16 22:29:12] COLLECT nick=mario score=2 pos=(10,2)
+[2026-06-16 22:29:13] COLLECT nick=mario score=3 pos=(11,2)
+[2026-06-16 22:29:13] COLLECT nick=mario score=4 pos=(12,3)
+[2026-06-16 22:29:14] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:29:15] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:29:23] COLLECT nick=luca score=1 pos=(11,10)
+[2026-06-16 22:29:24] COLLECT nick=luca score=2 pos=(13,10)
+[2026-06-16 22:29:24] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:29:25] GLOBAL_MAP sent to nick=luca
+[2026-06-16 22:29:31] EXIT nick=luca score=2
+[2026-06-16 22:29:31] GAME_END nick=luca msg=GAME_END WIN luca 2
+[2026-06-16 22:29:31] DISCONNECT nick=luca
+[2026-06-16 22:29:34] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:29:44] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:29:54] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:30:04] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:30:14] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:30:24] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:30:34] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:30:44] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:30:54] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:31:04] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:31:14] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:31:24] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:31:34] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:31:44] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:31:54] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:32:04] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:32:14] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:32:24] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:32:34] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:32:44] GLOBAL_MAP sent to nick=mario
+[2026-06-16 22:32:44] GAME_END nick=mario msg=GAME_END WIN mario 4
+[2026-06-16 22:32:44] DISCONNECT nick=mario
