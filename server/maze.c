@@ -4,29 +4,30 @@
 #include <time.h>
 #include "maze.h"
 
-/* ---- parametri generazione ---- */
+/*  parametri generazione  */
 #define NUM_OBJECTS  10
 #define NUM_EXITS     2
 
-/* ============================================================
- *  Generazione con algoritmo di Prim randomizzato
- *
- *  Struttura della griglia: celle "logiche" su indici pari (0,2,4,...),
- *  muri tra celle adiacenti su indici dispari.
- *  Prim parte da una cella seme, mantiene una lista di muri candidati
- *  ("frontiera") e ad ogni passo sceglie un muro a caso che separa
- *  una cella già nel labirinto da una cella non ancora visitata.
- *  Risultato: labirinto perfetto con struttura più "aperta" e ramificata
- *  rispetto al DFS (corridoi più brevi, più incroci).
- * ============================================================ */
+/* 
+   Generazione con algoritmo di Prim randomizzato
+ 
+   Struttura della griglia: celle "logiche" su indici pari (0,2,4,...),
+   muri tra celle adiacenti su indici dispari.
+   Prim parte da una cella seme, mantiene una lista di muri candidati
+   ("frontiera") e ad ogni passo sceglie un muro a caso che separa
+   una cella già nel labirinto da una cella non ancora visitata.
+   Risultato: labirinto perfetto con struttura più "aperta" e ramificata
+   rispetto al DFS (corridoi più brevi, più incroci).
+   */
 
 /* direzioni: passo 2 (celle logiche) e passo 1 (muro intermedio) */
+
 static const int DR2[] = {-2,  2,  0,  0};
 static const int DC2[] = { 0,  0, -2,  2};
 static const int DR1[] = {-1,  1,  0,  0};
 static const int DC1[] = { 0,  0, -1,  1};
 
-/* ---- lista dinamica di muri di frontiera ---- */
+/*  lista dinamica di muri di frontiera  */
 typedef struct { int r, c, dir; } Wall;
 
 static Wall  *frontier     = NULL;
@@ -49,6 +50,7 @@ static Wall frontier_pop_random(void) {
 }
 
 /* aggiunge alla frontiera tutti i muri non ancora visitati attorno a (r,c) */
+
 static void add_frontier(Maze *maze, int r, int c) {
     for (int d = 0; d < 4; d++) {
         int nr = r + DR2[d];

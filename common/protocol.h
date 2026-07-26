@@ -24,6 +24,12 @@
 #define USERS_FILE           "users.txt"
 #define LOG_FILE             "server.log"
 
+
+/* ---------- messaggi stato del player ---------- */
+#define CMD_READY   "READY"
+#define MSG_WAITING "WAITING"   /* server → client: quanti sono pronti */
+#define MSG_START   "START"     /* server → client: partita inizia     */
+
 /* 
  *  Comandi CLIENT → SERVER  
  *
