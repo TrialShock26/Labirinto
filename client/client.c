@@ -9,8 +9,11 @@
 #include <sys/select.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <signal.h>
 
 #include "../common/protocol.h"
+
+/*
 
 #define ANSI_RESET      "\033[0m"
 #define ANSI_BOLD       "\033[1m"
@@ -31,11 +34,53 @@
 #define ANSI_CLEAR      "\033[2J\033[H"
 #define ANSI_CLEAR_LINE "\033[2K\r"
 
+*/
+
+#define ANSI_RESET      ""
+#define ANSI_BOLD       ""
+#define ANSI_RED        ""
+#define ANSI_GREEN      ""
+#define ANSI_YELLOW     ""
+#define ANSI_BLUE       ""
+#define ANSI_MAGENTA    ""
+#define ANSI_CYAN       ""
+#define ANSI_WHITE      ""
+#define ANSI_GRAY       ""
+#define ANSI_BG_BLACK   ""
+#define ANSI_BG_WHITE   ""
+#define ANSI_BG_BLUE    ""
+#define ANSI_BG_GREEN   ""
+#define ANSI_BG_YELLOW  ""
+#define ANSI_BG_RED     ""
+#define ANSI_CLEAR      "\033[2J\033[H"
+#define ANSI_CLEAR_LINE "\033[2K\r"
+
+
+/* posizione fissa dove inizia la mappa nel buffer alternativo */
+#define MAP_START_ROW  5   /* riga dove inizia il disegno della mappa */
+
+/*
+    alternate screen buffer
+*/
+#define ANSI_ALT_SCREEN_ON  "\033[?1049h"
+#define ANSI_ALT_SCREEN_OFF "\033[?1049l"
+#define ANSI_CURSOR_HIDE    "\033[?25l"
+#define ANSI_CURSOR_SHOW    "\033[?25h"
+
 static int g_sock     = -1;
 static int g_score    = 0;
 static int g_exited   = 0;
 static int g_in_lobby = 1;
 static int g_ready    = 0;
+
+/*
+    per memorizzare la mappa locale per il posizionamento a sinistra
+*/
+
+static char g_local_data[MAX_MSG_LEN]         = {0};
+static int  g_local_rows = 0, g_local_cols = 0;
+static char g_global_data[MAZE_ROWS*MAZE_COLS+4] = {0};
+static int  g_global_rows = 0, g_global_cols = 0;
 
 static void send_line(const char *msg) {
     char buf[MAX_MSG_LEN + 2];
@@ -67,7 +112,9 @@ static int read_line(int fd, char *buf, int maxlen) {
 */
 
 static void display_lobby(int ready, int total) {
-    printf(ANSI_CLEAR);
+    printf("\033[1;1H");   /* cursore in cima */
+    printf("\033[J");       /* cancella tutto sotto */
+
     printf(ANSI_BOLD ANSI_CYAN
            "  ╔══════════════════════════════════╗\n"
            "  ║        LABYRINTH  GAME           ║\n"
@@ -107,6 +154,7 @@ static void display_lobby(int ready, int total) {
     visualizzazione mappa locale
 */
 
+/*
 static void display_map(const char *type, int rows, int cols, const char *data) {
     printf("\n" ANSI_BOLD "=== %s MAP (%dx%d) ===" ANSI_RESET
            "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n",
@@ -158,7 +206,111 @@ static void display_map(const char *type, int rows, int cols, const char *data) 
            ANSI_BOLD "[q]" ANSI_RESET "=esci  > ");
     fflush(stdout);
 }
+*/
 
+
+/* ridisegna entrambe le mappe affiancate, sempre alla stessa posizione */
+static void redraw_maps(void) {
+    if (g_local_rows == 0 && g_global_rows == 0) return;
+
+    printf("\033[5;1H");
+    printf("\033[J");
+
+    /* intestazioni */
+    printf(ANSI_BOLD "  LOCAL MAP" ANSI_RESET);
+    int local_width = g_local_cols * 2 + 4;   /* |..| + 2 spazi iniziali */
+    for (int i = 11; i < local_width + 5; i++) printf(" ");
+    printf(ANSI_BOLD "GLOBAL MAP" ANSI_RESET
+           "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n", g_score);
+
+    /* bordo superiore */
+    printf("  +");
+    for (int c = 0; c < g_local_cols; c++) printf("--");
+    printf("+");
+    printf("     +");
+    for (int c = 0; c < g_global_cols; c++) printf("--");
+    printf("+\n");
+
+    int max_rows = g_global_rows > g_local_rows ? g_global_rows : g_local_rows;
+    int local_done = 0;
+
+    for (int r = 0; r < max_rows; r++) {
+
+        /* --- lato sinistro: mappa locale --- */
+        if (!local_done && r == g_local_rows) {
+            /* chiudi il bordo locale */
+            printf("  +");
+            for (int c = 0; c < g_local_cols; c++) printf("--");
+            printf("+");
+            local_done = 1;
+            printf("     ");
+        } else if (local_done) {
+            /* spazio per allinearsi alla globale */
+            for (int i = 0; i < local_width + 5; i++) printf(" ");
+        } else {
+            printf("  |");
+            for (int c = 0; c < g_local_cols; c++) {
+                char ch = g_local_data[r * g_local_cols + c];
+                switch (ch) {
+                    case CELL_WALL:    printf(ANSI_BG_WHITE " " SYM_WALL ANSI_RESET);                         break;
+                    case CELL_FREE:    printf(ANSI_BG_BLACK "  " ANSI_RESET);                                  break;
+                    case CELL_OBJECT:  printf(ANSI_BG_BLACK ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET); break;
+                    case CELL_EXIT:    printf(ANSI_BG_GREEN ANSI_WHITE ANSI_BOLD " " SYM_EXIT ANSI_RESET);    break;
+                    case CELL_UNKNOWN: printf(ANSI_BG_BLACK ANSI_GRAY " " SYM_UNKNOWN ANSI_RESET);            break;
+                    case CELL_PLAYER:  printf(ANSI_BG_BLUE ANSI_CYAN ANSI_BOLD " " SYM_PLAYER ANSI_RESET);   break;
+                    default:           printf(ANSI_BG_BLACK " %c" ANSI_RESET, ch);                             break;
+                }
+            }
+            printf("|     ");
+        }
+
+        /* --- lato destro: mappa globale --- */
+        if (r < g_global_rows) {
+            printf("|");
+            for (int c = 0; c < g_global_cols; c++) {
+                char ch = g_global_data[r * g_global_cols + c];
+                switch (ch) {
+                    case CELL_WALL:    printf(ANSI_BG_WHITE " " SYM_WALL ANSI_RESET);                         break;
+                    case CELL_FREE:    printf(ANSI_BG_BLACK "  " ANSI_RESET);                                  break;
+                    case CELL_OBJECT:  printf(ANSI_BG_BLACK ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET); break;
+                    case CELL_EXIT:    printf(ANSI_BG_GREEN ANSI_WHITE ANSI_BOLD " " SYM_EXIT ANSI_RESET);    break;
+                    case CELL_UNKNOWN: printf(ANSI_BG_BLACK ANSI_GRAY " " SYM_UNKNOWN ANSI_RESET);            break;
+                    case CELL_PLAYER:  printf(ANSI_BG_BLUE ANSI_CYAN ANSI_BOLD " " SYM_PLAYER ANSI_RESET);   break;
+                    default:           printf(ANSI_BG_BLACK " %c" ANSI_RESET, ch);                             break;
+                }
+            }
+            printf("|");
+        }
+        printf("\n");
+    }
+
+    /* bordo inferiore locale (se non già chiuso nel loop) */
+    if (!local_done) {
+        printf("  +");
+        for (int c = 0; c < g_local_cols; c++) printf("--");
+        printf("+     ");
+    } else {
+        for (int i = 0; i < local_width + 5; i++) printf(" ");
+    }
+
+    /* bordo inferiore globale */
+    printf("+");
+    for (int c = 0; c < g_global_cols; c++) printf("--");
+    printf("+\n");
+
+    printf(ANSI_GRAY
+           "  legenda: " SYM_WALL "=muro  "
+           SYM_OBJECT "=oggetto  "
+           SYM_EXIT   "=uscita  "
+           SYM_PLAYER "=tu  "
+           SYM_UNKNOWN "=inesplorato"
+           ANSI_RESET "\n\n");
+
+    printf(ANSI_BOLD "[w/s/a/d]" ANSI_RESET "=muovi  "
+           ANSI_BOLD "[l]" ANSI_RESET "=lista  "
+           ANSI_BOLD "[q]" ANSI_RESET "=esci  > ");
+    fflush(stdout);
+}
 
 static int handle_server_msg(const char *line) {
     char cmd[16];
@@ -205,21 +357,23 @@ static int handle_server_msg(const char *line) {
 
     /* mappa locale */
     if (strcmp(cmd, "LOCAL") == 0) {
-        int rows, cols; char data[MAX_MSG_LEN];
-        if (sscanf(line, "LOCAL %d %d %s", &rows, &cols, data) == 3)
-            display_map("LOCAL", rows, cols, data);
-        return 1;
+    if (sscanf(line, "LOCAL %d %d %s",
+               &g_local_rows, &g_local_cols, g_local_data) == 3)
+        redraw_maps();
+    return 1;
     }
 
-    /* mappa globale */
+    /*mappa globale */
+
     if (strcmp(cmd, "GLOBAL") == 0) {
-        int rows, cols; char data[MAZE_ROWS * MAZE_COLS + 4];
-        if (sscanf(line, "GLOBAL %d %d %s", &rows, &cols, data) == 3)
-            display_map("GLOBAL", rows, cols, data);
+        if (sscanf(line, "GLOBAL %d %d %s",
+                &g_global_rows, &g_global_cols, g_global_data) == 3)
+            redraw_maps();
         return 1;
     }
 
     /* raccolta oggetto */
+
     if (strcmp(cmd, "COLLECT") == 0) {
         sscanf(line, "COLLECT %d", &g_score);
         printf("\n" ANSI_YELLOW ANSI_BOLD
@@ -229,6 +383,7 @@ static int handle_server_msg(const char *line) {
     }
 
     /* uscita */
+    
     if (strcmp(cmd, "EXIT_OK") == 0) {
         sscanf(line, "EXIT_OK %d", &g_score);
         printf("\n" ANSI_GREEN ANSI_BOLD
@@ -425,6 +580,12 @@ static void game_loop(void) {
     }
 }
 
+static void cleanup_terminal(int sig) {
+    printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
+    fflush(stdout);
+    exit(sig);
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         fprintf(stderr, "uso: %s <host> <porta>\n", argv[0]);
@@ -454,9 +615,25 @@ int main(int argc, char *argv[]) {
 
     printf(ANSI_CYAN "  Connesso a %s:%d\n" ANSI_RESET, host, port);
 
+    /*
     if (!authenticate()) { close(g_sock); return 1; }
 
     game_loop();
+
+    close(g_sock);*/
+
+    if (!authenticate()) { close(g_sock); return 1; }
+
+    signal(SIGINT,  cleanup_terminal);
+    signal(SIGTERM, cleanup_terminal);
+
+    printf(ANSI_ALT_SCREEN_ON ANSI_CURSOR_HIDE);
+    fflush(stdout);
+
+    game_loop();
+
+    printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
+    fflush(stdout);
 
     close(g_sock);
     return 0;

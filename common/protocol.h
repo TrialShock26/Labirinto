@@ -4,7 +4,7 @@
 /* ---------- dimensioni labirinto ---------- */
 #define MAZE_ROWS       20
 #define MAZE_COLS       20
-#define VIEW_RADIUS     2          /* finestra locale: (2*VIEW_RADIUS+1)^2 */
+#define VIEW_RADIUS     1          /* finestra locale: (2*VIEW_RADIUS+1)^2 */
 
 /* ---------- celle del labirinto ---------- */
 #define CELL_FREE       '.'

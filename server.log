@@ -604,3 +604,183 @@
 [2026-07-26 15:21:53] new connection from 127.0.0.1:57942
 [2026-07-26 15:22:01] new connection from 127.0.0.1:53692
 [2026-07-26 15:22:04] LOGIN nick=mario from 127.0.0.1
+[2026-07-26 17:02:55] === server started ===
+[2026-07-26 17:02:55] maze generated (20x20)
+[2026-07-26 17:02:55] listening on port 5000
+[2026-07-26 17:03:06] new connection from 127.0.0.1:36374
+[2026-07-26 17:03:09] LOGIN nick=mario from 127.0.0.1
+[2026-07-26 17:03:23] new connection from 127.0.0.1:41544
+[2026-07-26 17:03:27] LOGIN nick=luca from 127.0.0.1
+[2026-07-26 17:05:12] === server started ===
+[2026-07-26 17:05:12] maze generated (20x20)
+[2026-07-26 17:05:12] listening on port 5000
+[2026-07-26 17:05:19] new connection from 127.0.0.1:55266
+[2026-07-26 17:05:22] LOGIN nick=mario from 127.0.0.1
+[2026-07-26 17:05:31] new connection from 127.0.0.1:51534
+[2026-07-26 17:05:33] LOGIN nick=luca from 127.0.0.1
+[2026-07-26 17:06:43] COLLECT nick=luca score=1 pos=(3,2)
+[2026-07-26 17:08:18] DISCONNECT nick=luca
+[2026-07-26 17:08:18] GAME_END nick=mario msg=GAME_END WIN mario 0
+[2026-07-26 17:08:18] DISCONNECT nick=mario
+[2026-07-26 17:12:14] === server started ===
+[2026-07-26 17:12:14] maze generated (20x20)
+[2026-07-26 17:12:14] listening on port 5000
+[2026-07-26 17:12:24] new connection from 127.0.0.1:35400
+[2026-07-26 17:12:27] LOGIN nick=mario from 127.0.0.1
+[2026-07-26 17:12:40] new connection from 127.0.0.1:52736
+[2026-07-26 17:12:44] LOGIN nick=luca from 127.0.0.1
+[2026-07-26 17:17:19] GAME_END nick=mario msg=GAME_END DRAW 0
+[2026-07-26 17:17:19] DISCONNECT nick=mario
+[2026-07-26 17:17:19] GAME_END nick=luca msg=GAME_END WIN luca 0
+[2026-07-26 17:17:19] DISCONNECT nick=luca
+[2026-07-26 17:22:00] === server started ===
+[2026-07-26 17:22:00] maze generated (20x20)
+[2026-07-26 17:22:00] listening on port 50000
+[2026-07-26 17:22:02] server terminated by signal
+[2026-07-26 17:22:18] === server started ===
+[2026-07-26 17:22:18] maze generated (20x20)
+[2026-07-26 17:22:28] new connection from 127.0.0.1:48218
+[2026-07-26 17:22:30] LOGIN nick=mario from 127.0.0.1
+[2026-07-26 17:22:39] new connection from 127.0.0.1:48692
+[2026-07-26 17:22:41] LOGIN nick=luca from 127.0.0.1
+[2026-07-26 17:22:43] GAME_END nick=mario msg=GAME_END DRAW 0
+[2026-07-26 17:22:43] DISCONNECT nick=mario
+[2026-07-26 17:22:44] DISCONNECT nick=luca
+[2026-07-26 17:23:04] new connection from 127.0.0.1:60936
+[2026-07-26 17:23:06] new connection from 127.0.0.1:60952
+[2026-07-26 17:23:09] LOGIN nick=luca from 127.0.0.1
+[2026-07-26 17:23:12] LOGIN nick=mario from 127.0.0.1
+[2026-07-26 17:23:14] GAME_END nick=luca msg=GAME_END DRAW 0
+[2026-07-26 17:23:14] DISCONNECT nick=luca
+[2026-07-26 17:23:15] DISCONNECT nick=mario
+[2026-07-26 17:23:50] === server started ===
+[2026-07-26 17:23:50] maze generated (20x20)
+[2026-07-26 17:23:53] === server started ===
+[2026-07-26 17:23:53] maze generated (20x20)
+[2026-07-26 17:23:53] listening on port 5001
+[2026-07-26 17:24:01] new connection from 127.0.0.1:52770
+[2026-07-26 17:24:04] LOGIN nick=mario from 127.0.0.1
+[2026-07-26 17:24:12] new connection from 127.0.0.1:36578
+[2026-07-26 17:24:13] LOGIN nick=luca from 127.0.0.1
+[2026-07-26 17:25:11] COLLECT nick=luca score=1 pos=(8,2)
+[2026-07-26 17:25:18] COLLECT nick=mario score=1 pos=(10,10)
+[2026-07-26 17:25:19] EXIT nick=mario score=1
+[2026-07-26 17:25:19] GAME_END nick=mario msg=GAME_END DRAW 1
+[2026-07-26 17:25:19] DISCONNECT nick=mario
+[2026-07-26 17:25:19] GAME_END nick=luca msg=GAME_END WIN luca 1
+[2026-07-26 17:25:19] DISCONNECT nick=luca
+[2026-07-26 17:33:41] server terminated by signal
+[2026-07-26 17:34:01] === server started ===
+[2026-07-26 17:34:01] maze generated (20x20)
+[2026-07-26 17:34:01] listening on port 5000
+[2026-07-26 17:34:12] new connection from 127.0.0.1:35442
+[2026-07-26 17:34:17] new connection from 127.0.0.1:52764
+[2026-07-26 17:34:20] LOGIN nick=mario from 127.0.0.1
+[2026-07-26 17:34:31] new connection from 127.0.0.1:34762
+[2026-07-26 17:34:34] LOGIN nick=luca from 127.0.0.1
+[2026-07-26 17:39:06] GAME_END nick=mario msg=GAME_END DRAW 0
+[2026-07-26 17:39:06] DISCONNECT nick=mario
+[2026-07-26 17:39:06] GAME_END nick=luca msg=GAME_END WIN luca 0
+[2026-07-26 17:39:06] DISCONNECT nick=luca
+[2026-07-27 12:03:22] === server started ===
+[2026-07-27 12:03:22] maze generated (20x20)
+[2026-07-27 12:03:22] listening on port 5000
+[2026-07-27 12:03:35] new connection from 127.0.0.1:46488
+[2026-07-27 12:03:41] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:03:48] new connection from 127.0.0.1:33526
+[2026-07-27 12:03:50] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:04:31] DISCONNECT nick=mario
+[2026-07-27 12:04:31] GAME_END nick=luca msg=GAME_END WIN luca 0
+[2026-07-27 12:04:31] DISCONNECT nick=luca
+[2026-07-27 12:07:29] === server started ===
+[2026-07-27 12:07:29] maze generated (20x20)
+[2026-07-27 12:07:29] listening on port 5000
+[2026-07-27 12:07:35] new connection from 127.0.0.1:60350
+[2026-07-27 12:07:39] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:07:46] new connection from 127.0.0.1:57024
+[2026-07-27 12:07:49] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:12:19] DISCONNECT nick=luca
+[2026-07-27 12:12:19] GAME_END nick=mario msg=GAME_END WIN mario 0
+[2026-07-27 12:12:19] DISCONNECT nick=mario
+[2026-07-27 12:12:21] server terminated by signal
+[2026-07-27 12:12:36] === server started ===
+[2026-07-27 12:12:36] maze generated (20x20)
+[2026-07-27 12:12:36] listening on port 5000
+[2026-07-27 12:12:44] new connection from 127.0.0.1:57894
+[2026-07-27 12:12:46] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:12:53] new connection from 127.0.0.1:45902
+[2026-07-27 12:12:55] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:13:05] COLLECT nick=luca score=1 pos=(16,2)
+[2026-07-27 12:13:39] EXIT nick=mario score=0
+[2026-07-27 12:13:39] GAME_END nick=mario msg=GAME_END WIN luca 1
+[2026-07-27 12:13:39] DISCONNECT nick=mario
+[2026-07-27 12:13:39] GAME_END nick=luca msg=GAME_END WIN luca 1
+[2026-07-27 12:13:39] DISCONNECT nick=luca
+[2026-07-27 12:13:41] new connection from 127.0.0.1:43222
+[2026-07-27 12:13:43] new connection from 127.0.0.1:43232
+[2026-07-27 12:13:45] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:13:53] new connection from 127.0.0.1:51100
+[2026-07-27 12:13:56] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:14:07] COLLECT nick=luca score=1 pos=(13,6)
+[2026-07-27 12:14:20] COLLECT nick=luca score=2 pos=(15,6)
+[2026-07-27 12:17:39] GAME_END nick=mario msg=GAME_END WIN luca 2
+[2026-07-27 12:17:39] DISCONNECT nick=mario
+[2026-07-27 12:17:39] GAME_END nick=luca msg=GAME_END WIN luca 2
+[2026-07-27 12:17:39] DISCONNECT nick=luca
+[2026-07-27 12:22:06] === server started ===
+[2026-07-27 12:22:06] maze generated (20x20)
+[2026-07-27 12:22:08] === server started ===
+[2026-07-27 12:22:08] maze generated (20x20)
+[2026-07-27 12:22:08] listening on port 5001
+[2026-07-27 12:22:17] new connection from 127.0.0.1:52326
+[2026-07-27 12:22:21] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:22:38] new connection from 127.0.0.1:34722
+[2026-07-27 12:22:40] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:23:14] COLLECT nick=mario score=1 pos=(6,16)
+[2026-07-27 12:24:09] new connection from 127.0.0.1:52136
+[2026-07-27 12:24:13] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:24:19] new connection from 127.0.0.1:40448
+[2026-07-27 12:24:24] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:24:31] DISCONNECT nick=luca
+[2026-07-27 12:24:31] GAME_END nick=mario msg=GAME_END WIN mario 1
+[2026-07-27 12:24:31] DISCONNECT nick=mario
+[2026-07-27 12:24:35] new connection from 127.0.0.1:42520
+[2026-07-27 12:24:37] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:24:45] new connection from 127.0.0.1:56578
+[2026-07-27 12:24:50] REGISTER nick=paolo from 127.0.0.1
+[2026-07-27 12:24:50] LOGIN nick=paolo from 127.0.0.1
+[2026-07-27 12:24:58] new connection from 127.0.0.1:48214
+[2026-07-27 12:25:00] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:25:18] DISCONNECT nick=mario
+[2026-07-27 12:25:18] DISCONNECT nick=luca
+[2026-07-27 12:25:18] GAME_END nick=paolo msg=GAME_END WIN paolo 0
+[2026-07-27 12:25:18] DISCONNECT nick=paolo
+[2026-07-27 12:28:56] === server started ===
+[2026-07-27 12:28:56] maze generated (20x20)
+[2026-07-27 12:28:56] listening on port 5000
+[2026-07-27 12:29:19] new connection from 127.0.0.1:42974
+[2026-07-27 12:29:23] LOGIN nick=paolo from 127.0.0.1
+[2026-07-27 12:29:27] === server started ===
+[2026-07-27 12:29:27] maze generated (20x20)
+[2026-07-27 12:29:37] new connection from 127.0.0.1:37728
+[2026-07-27 12:29:41] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:30:09] COLLECT nick=paolo score=1 pos=(5,8)
+[2026-07-27 12:30:22] COLLECT nick=luca score=1 pos=(12,6)
+[2026-07-27 12:33:58] GAME_END nick=luca msg=GAME_END DRAW 1
+[2026-07-27 12:33:58] DISCONNECT nick=luca
+[2026-07-27 12:33:58] GAME_END nick=paolo msg=GAME_END WIN paolo 1
+[2026-07-27 12:33:58] DISCONNECT nick=paolo
+[2026-07-27 12:34:26] new connection from 127.0.0.1:57980
+[2026-07-27 12:34:27] new connection from 127.0.0.1:57996
+[2026-07-27 12:34:30] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:34:33] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:35:29] GAME_END nick=luca msg=GAME_END DRAW 0
+[2026-07-27 12:35:29] DISCONNECT nick=luca
+[2026-07-27 12:35:30] DISCONNECT nick=mario
+[2026-07-27 12:36:06] new connection from 127.0.0.1:56128
+[2026-07-27 12:36:08] LOGIN nick=mario from 127.0.0.1
+[2026-07-27 12:36:19] new connection from 127.0.0.1:52414
+[2026-07-27 12:36:23] LOGIN nick=luca from 127.0.0.1
+[2026-07-27 12:36:25] GAME_END nick=mario msg=GAME_END DRAW 0
+[2026-07-27 12:36:25] DISCONNECT nick=mario
+[2026-07-27 12:36:26] DISCONNECT nick=luca
