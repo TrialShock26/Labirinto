@@ -26,10 +26,10 @@ CLIENT_BIN = $(CLIENT_DIR)/client
 all: $(SERVER_BIN) $(CLIENT_BIN)
 
 $(SERVER_BIN): $(SERVER_SRCS) $(COMMON_DIR)/protocol.h
-	$(CC) $(CFLAGS) -o $@ $(SERVER_SRCS) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@.out $(SERVER_SRCS) $(LDFLAGS)
 
 $(CLIENT_BIN): $(CLIENT_SRCS) $(COMMON_DIR)/protocol.h
-	$(CC) $(CFLAGS) -o $@ $(CLIENT_SRCS) $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@.out $(CLIENT_SRCS) $(LDFLAGS)
 
 clean:
 	rm -f $(SERVER_BIN) $(CLIENT_BIN)
