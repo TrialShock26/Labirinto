@@ -18,9 +18,7 @@
 #include "logger.h"
 #include "game.h"
 
-/* 
-  Stato globale condiviso tra i thread
-*/
+// test Stato globale condiviso tra i thread
 
 static Maze        g_maze;
 static PlayerTable g_pt;
