@@ -1,15 +1,3 @@
-/*
-  Architettura in breve:
-    pthread_create() per ogni client connesso (un thread per client)
-    Maze e PlayerTable sono variabili globali, accessibili da tutti i thread
-    pthread_mutex_t per mutua esclusione sulla struttura condivisa
-    Ogni thread usa select() con timeout per inviare
-    periodicamente la mappa globale al proprio client senza bloccarsi
-    La logica di fine partita (timeout, vittoria) è verificata da
-    ogni thread autonomamente tramite game_check_end()
-    auth_mutex protegge l'accesso concorrente a users.txt
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,9 +37,7 @@ static int g_client_fds[MAX_PLAYERS];
 
 static int g_listen_fd = -1;
 
-/* 
-   Utility
-*/
+// Utility
 static void send_line(int fd, const char *msg) {
     char buf[MAX_MSG_LEN + 2];
     int  n = snprintf(buf, sizeof(buf), "%s\n", msg);

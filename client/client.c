@@ -14,7 +14,6 @@
 #include "../common/protocol.h"
 
 /*
-
 #define ANSI_RESET      "\033[0m"
 #define ANSI_BOLD       "\033[1m"
 #define ANSI_RED        "\033[31m"
@@ -33,9 +32,16 @@
 #define ANSI_BG_RED     "\033[41m"
 #define ANSI_CLEAR      "\033[2J\033[H"
 #define ANSI_CLEAR_LINE "\033[2K\r"
-
 */
 
+// Simboli
+#define SYM_PLAYER   "\xe1\x8c\xb8"
+#define SYM_WALL     "\xf0\x91\x80\xa9"
+#define SYM_OBJECT   "@"
+#define SYM_EXIT     "E"
+#define SYM_UNKNOWN  "?"
+
+// Colori
 #define ANSI_RESET      ""
 #define ANSI_BOLD       ""
 #define ANSI_RED        ""
@@ -49,19 +55,17 @@
 #define ANSI_BG_BLACK   ""
 #define ANSI_BG_WHITE   ""
 #define ANSI_BG_BLUE    ""
-#define ANSI_BG_GREEN   ""
-#define ANSI_BG_YELLOW  ""
+#define ANSI_BG_GREEN   "\033[42m"
+#define ANSI_BG_YELLOW  "\033[43m"
 #define ANSI_BG_RED     ""
 #define ANSI_CLEAR      "\033[2J\033[H"
 #define ANSI_CLEAR_LINE "\033[2K\r"
 
 
-/* posizione fissa dove inizia la mappa nel buffer alternativo */
-#define MAP_START_ROW  5   /* riga dove inizia il disegno della mappa */
+// Posizione fissa dove inizia la mappa nel buffer alternativo
+#define MAP_START_ROW  5
 
-/*
-    alternate screen buffer
-*/
+// Alternate screen buffer
 #define ANSI_ALT_SCREEN_ON  "\033[?1049h"
 #define ANSI_ALT_SCREEN_OFF "\033[?1049l"
 #define ANSI_CURSOR_HIDE    "\033[?25l"
@@ -73,11 +77,9 @@ static int g_exited   = 0;
 static int g_in_lobby = 1;
 static int g_ready    = 0;
 
-/*
-    per memorizzare la mappa locale per il posizionamento a sinistra
-*/
+// per memorizzare la mappa locale per il posizionamento a sinistra
 
-static char g_local_data[MAX_MSG_LEN]         = {0};
+static char g_local_data[MAX_MSG_LEN] = {0};
 static int  g_local_rows = 0, g_local_cols = 0;
 static char g_global_data[MAZE_ROWS*MAZE_COLS+4] = {0};
 static int  g_global_rows = 0, g_global_cols = 0;
@@ -100,25 +102,16 @@ static int read_line(int fd, char *buf, int maxlen) {
     return i;
 }
 
-#define SYM_PLAYER   "\xe1\x8c\xb8"
-#define SYM_WALL     "\xf0\x91\x80\xa9"
-#define SYM_OBJECT   "@"
-#define SYM_EXIT     "E"
-#define SYM_UNKNOWN  "?"
-
-
-/*
-    visualizzazione lobby pre-partita
-*/
+// Visualizzazione lobby pre-partita
 
 static void display_lobby(int ready, int total) {
-    printf("\033[1;1H");   /* cursore in cima */
-    printf("\033[J");       /* cancella tutto sotto */
+    printf("\033[1;1H");   // Cursore in cima
+    printf("\033[J");       // Cancella tutto sotto
 
     printf(ANSI_BOLD ANSI_CYAN
            "  ╔══════════════════════════════════╗\n"
-           "  ║        LABYRINTH  GAME           ║\n"
-           "  ║          — LOBBY —               ║\n"
+           "  ║          LABYRINTH GAME          ║\n"
+           "  ║             — LOBBY —            ║\n"
            "  ╚══════════════════════════════════╝\n"
            ANSI_RESET "\n");
 
@@ -150,9 +143,7 @@ static void display_lobby(int ready, int total) {
     fflush(stdout);
 }
 
-/*
-    visualizzazione mappa locale
-*/
+// Visualizzazione mappa locale TODO rimuovere
 
 /*
 static void display_map(const char *type, int rows, int cols, const char *data) {
@@ -209,7 +200,8 @@ static void display_map(const char *type, int rows, int cols, const char *data) 
 */
 
 
-/* ridisegna entrambe le mappe affiancate, sempre alla stessa posizione */
+// Ridisegna entrambe le mappe affiancate, sempre alla stessa posizione
+
 static void redraw_maps(void) {
     if (g_local_rows == 0 && g_global_rows == 0) return;
 
@@ -328,16 +320,16 @@ static int handle_server_msg(const char *line) {
         g_in_lobby = 0;
         printf(ANSI_CLEAR);
         printf(ANSI_GREEN ANSI_BOLD
-               "\n  ╔══════════════════════════════════╗\n"
-               "  ║      PARTITA INIZIATA!           ║\n"
+             "\n  ╔══════════════════════════════════╗\n"
+               "  ║         PARTITA INIZIATA!        ║\n"
                "  ╚══════════════════════════════════╝\n"
                ANSI_RESET "\n");
-        printf("  " ANSI_BOLD "w" ANSI_RESET "=Nord  "
-                   ANSI_BOLD "s" ANSI_RESET "=Sud  "
-                   ANSI_BOLD "a" ANSI_RESET "=Ovest  "
-                   ANSI_BOLD "d" ANSI_RESET "=Est  "
-                   ANSI_BOLD "l" ANSI_RESET "=Lista  "
-                   ANSI_BOLD "q" ANSI_RESET "=Esci\n\n");
+        printf("  " ANSI_BOLD "w" ANSI_RESET " = Nord  "
+                   ANSI_BOLD "s" ANSI_RESET " = Sud  "
+                   ANSI_BOLD "a" ANSI_RESET " = Ovest  "
+                   ANSI_BOLD "d" ANSI_RESET " = Est  "
+                   ANSI_BOLD "l" ANSI_RESET " = Lista  "
+                   ANSI_BOLD "q" ANSI_RESET " = Esci\n\n");
         fflush(stdout);
         /* legge subito LOCAL che il server manda immediatamente dopo START */
         char next[MAX_MSG_LEN];
@@ -399,7 +391,7 @@ static int handle_server_msg(const char *line) {
         const char *payload = line + 9;
         printf("\n");
         printf(ANSI_BOLD "╔══════════════════════════════╗\n" ANSI_RESET);
-        printf(ANSI_BOLD "║       FINE PARTITA           ║\n" ANSI_RESET);
+        printf(ANSI_BOLD "║         FINE PARTITA         ║\n" ANSI_RESET);
         printf(ANSI_BOLD "╚══════════════════════════════╝\n" ANSI_RESET);
         if (strncmp(payload, "WIN", 3) == 0) {
             char winner[MAX_NICK_LEN]; int score;
@@ -452,7 +444,7 @@ static int authenticate(void) {
     char buf[MAX_MSG_LEN], msg[MAX_MSG_LEN];
 
     printf(ANSI_BOLD "\n  ╔══════════════════════════╗\n" ANSI_RESET);
-    printf(ANSI_BOLD   "  ║   LABYRINTH  GAME        ║\n" ANSI_RESET);
+    printf(ANSI_BOLD   "  ║      LABYRINTH GAME      ║\n" ANSI_RESET);
     printf(ANSI_BOLD   "  ╚══════════════════════════╝\n\n" ANSI_RESET);
 
     printf("  (1) Registrati   (2) Login  > ");
@@ -570,7 +562,7 @@ static void game_loop(void) {
                     default:
                         printf(ANSI_GRAY
                                "  Comando non riconosciuto."
-                               " Usa w/s/a/d, l=lista, q=esci\n"
+                               " Usa w/a/s/d, l: lista, q: esci\n"
                                ANSI_RESET);
                         fflush(stdout);
                         break;
@@ -615,7 +607,7 @@ int main(int argc, char *argv[]) {
 
     printf(ANSI_CYAN "  Connesso a %s:%d\n" ANSI_RESET, host, port);
 
-    /*
+    /* TODO togliere
     if (!authenticate()) { close(g_sock); return 1; }
 
     game_loop();
