@@ -44,8 +44,8 @@
 */
 #define ANSI_ALT_SCREEN_ON  "\033[?1049h"
 #define ANSI_ALT_SCREEN_OFF "\033[?1049l"
-#define ANSI_CURSOR_HIDE    "\033[?32"
-#define ANSI_CURSOR_SHOW    "\033[?32"
+#define ANSI_CURSOR_HIDE    "\033[?25l"  
+#define ANSI_CURSOR_SHOW    "\033[?25h"  
 
 static int g_sock     = -1;
 static int g_score    = 0;
@@ -153,6 +153,12 @@ static void display_lobby(int ready, int total) {
 
 /*
     visualizzazione mappa locale
+*/
+
+/*
+static void display_map(const char *type, int rows, int cols, const char *data) {
+    ...
+}
 */
 
 
@@ -290,7 +296,7 @@ static void redraw_maps(void) {
 static void show_msg(const char *fmt, ...) {
     printf("\033[32;1H");
     printf(ANSI_CLEAR_LINE);
-    printf("\033[26;1H");
+    printf("\033[33;1H");
     printf(ANSI_CLEAR_LINE);
     printf("\033[32;1H");
     va_list ap;
@@ -299,6 +305,7 @@ static void show_msg(const char *fmt, ...) {
     va_end(ap);
     fflush(stdout);
 }
+
 
 
 static int handle_server_msg(const char *line) {
