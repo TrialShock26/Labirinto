@@ -28,8 +28,7 @@ typedef enum {
  */
 
 GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
-                          char *winner_nick, int *winner_score, int *draw,
-                          int max_players_ever);
+                          char *winner_nick, int *winner_score, int *draw);
 
 /* Costruisce il messaggio GAME_END da inviare al client.
  * buf deve essere almeno MAX_MSG_LEN byte. */

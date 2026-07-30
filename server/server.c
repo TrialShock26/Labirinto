@@ -37,6 +37,7 @@ static int g_client_fds[MAX_PLAYERS];
 
 static int g_listen_fd = -1;
 
+
 // Utility
 static void send_line(int fd, const char *msg) {
     char buf[MAX_MSG_LEN + 2];
@@ -282,13 +283,13 @@ static void *handle_client(void *arg) {
 
     /* loop di gioco */
     time_t last_global = time(NULL);
+    time_t last_time   = time(NULL);
 
     #define CHECK_GAME_END()                                                 \
     do {                                                                     \
         char   _wn[MAX_NICK_LEN]; int _ws, _draw;                           \
         pthread_mutex_lock(&g_mutex);                                        \
-        GameStatus _gs = game_check_end(&g_maze, &g_pt, _wn, &_ws, &_draw, \
-                                        g_max_players_ever);                 \
+        GameStatus _gs = game_check_end(&g_maze, &g_pt, _wn, &_ws, &_draw);                 \
         if (_gs != GAME_RUNNING) g_game_over = 1;                           \
         pthread_mutex_unlock(&g_mutex);                                      \
         if (_gs != GAME_RUNNING) {                                           \
@@ -304,8 +305,7 @@ static void *handle_client(void *arg) {
         if (g_game_over) {
             char _wn[MAX_NICK_LEN]; int _ws, _draw;
             pthread_mutex_lock(&g_mutex);
-            GameStatus _gs = game_check_end(&g_maze, &g_pt, _wn, &_ws, &_draw,
-                                            g_max_players_ever);
+            GameStatus _gs = game_check_end(&g_maze, &g_pt, _wn, &_ws, &_draw);
             pthread_mutex_unlock(&g_mutex);
             char _end[MAX_MSG_LEN];
             game_build_end_msg(_gs, _wn, _ws, _draw, _end);
@@ -315,14 +315,33 @@ static void *handle_client(void *arg) {
 
         CHECK_GAME_END();
 
-        time_t now       = time(NULL);
-        long   elapsed   = (long)(now - last_global);
-        long   remaining = (long)GLOBAL_MAP_INTERVAL - elapsed;
-        if (remaining <= 0) remaining = 0;
+        time_t now = time(NULL);
+
+        /* invia TIME ogni secondo */
+        if (now > last_time) {
+            last_time = now;
+            long game_remaining = (long)GAME_TIMEOUT
+                                - (long)(now - g_maze.start_time);
+            if (game_remaining < 0) game_remaining = 0;
+            char time_msg[32];
+            snprintf(time_msg, sizeof(time_msg), "TIME %ld", game_remaining);
+            send_line(fd, time_msg);
+        }
+
+        /* invia GLOBAL map ogni GLOBAL_MAP_INTERVAL secondi */
+        if (now - last_global >= GLOBAL_MAP_INTERVAL) {
+            pthread_mutex_lock(&g_mutex);
+            send_global_map(fd, &g_pt.slots[player_idx]);
+            pthread_mutex_unlock(&g_mutex);
+            last_global = now;
+            CHECK_GAME_END();
+            continue;
+        }
 
         struct timeval tv;
-        tv.tv_sec  = remaining;
+        tv.tv_sec  = 1;
         tv.tv_usec = 0;
+
 
         fd_set rfds;
         FD_ZERO(&rfds);
@@ -333,14 +352,7 @@ static void *handle_client(void *arg) {
         int ready = select(maxfd + 1, &rfds, NULL, NULL, &tv);
         if (ready < 0) { if (errno == EINTR) continue; break; }
 
-        if (ready == 0) {
-            pthread_mutex_lock(&g_mutex);
-            send_global_map(fd, &g_pt.slots[player_idx]);
-            pthread_mutex_unlock(&g_mutex);
-            last_global = time(NULL);
-            CHECK_GAME_END();
-            continue;
-        }
+        if (ready == 0) continue;
 
         if (FD_ISSET(g_notify_pipe[0], &rfds)) {
             char _buf[64];
