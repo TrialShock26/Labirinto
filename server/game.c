@@ -5,8 +5,7 @@
 #include "../common/protocol.h"
 
 GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
-                          char *winner_nick, int *winner_score, int *draw,
-                          int max_players_ever)
+                          char *winner_nick, int *winner_score, int *draw)
 {
     *winner_nick  = '\0';
     *winner_score = 0;
@@ -16,96 +15,84 @@ GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
 
     int  exited_count = 0;
     int  ingame_count = 0;
-    int  best_score   = -1;
-    char best_nick[MAX_NICK_LEN] = {0};
-    int  tied         = 0;
+    int  best_exited_score = -1;
+    char best_exited_nick[MAX_NICK_LEN] = {0};
+    int  exited_tied = 0;
+    int  best_any_score = -1;
+    char best_any_nick[MAX_NICK_LEN] = {0};
+    int  any_tied = 0;
 
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (!pt->slots[i].active) continue;
+
+        /* migliore tra TUTTI i giocatori (caso 3) */
+        if (pt->slots[i].score > best_any_score) {
+            best_any_score = pt->slots[i].score;
+            strncpy(best_any_nick, pt->slots[i].nick, MAX_NICK_LEN - 1);
+            any_tied = 0;
+        } else if (pt->slots[i].score == best_any_score) {
+            any_tied = 1;
+        }
+
+        /* classifica tra gli USCITI (casi 1 e 2) */
         if (pt->slots[i].exited) {
             exited_count++;
-            if (pt->slots[i].score > best_score) {
-                best_score = pt->slots[i].score;
-                strncpy(best_nick, pt->slots[i].nick, MAX_NICK_LEN - 1);
-                tied = 0;
-            } else if (pt->slots[i].score == best_score) {
-                tied = 1;
+            if (pt->slots[i].score > best_exited_score) {
+                best_exited_score = pt->slots[i].score;
+                strncpy(best_exited_nick, pt->slots[i].nick, MAX_NICK_LEN - 1);
+                exited_tied = 0;
+            } else if (pt->slots[i].score == best_exited_score) {
+                exited_tied = 1;
             }
         } else {
             ingame_count++;
         }
     }
 
-    /* caso -1: tutti hanno quittato, tabella vuota */
-    if (ingame_count == 0 && exited_count == 0) {
+    /* --- condizione: tutti hanno quittato --- */
+    if (exited_count == 0 && ingame_count == 0) {
         *winner_score = -1;
         return GAME_OVER_TIMEOUT;
     }
 
-    /* caso 0: rimasto un solo giocatore in gioco */
-    if (ingame_count == 1 && (exited_count > 0 || max_players_ever > 1)) {
-        for (int i = 0; i < MAX_PLAYERS; i++) {
-            if (!pt->slots[i].active || pt->slots[i].exited)
-                continue;
-
-            if (exited_count == 0) {
-                /* unico rimasto, vince lui */
-                strncpy(winner_nick, pt->slots[i].nick, MAX_NICK_LEN - 1);
-                *winner_score = pt->slots[i].score;
-                *draw = 0;
-            } else {
-                /* confronta con i già usciti */
-                if (pt->slots[i].score > best_score) {
-                    strncpy(winner_nick, pt->slots[i].nick, MAX_NICK_LEN - 1);
-                    *winner_score = pt->slots[i].score;
-                    *draw = 0;
-                } else if (pt->slots[i].score == best_score) {
-                    *winner_score = best_score;
-                    *draw = 1;
-                } else {
-                    strncpy(winner_nick, best_nick, MAX_NICK_LEN - 1);
-                    *winner_score = best_score;
-                    *draw = 0;
-                }
-            }
-            return GAME_OVER_EXIT;
+    /* --- condizione: tutti i giocatori attivi sono usciti --- */
+    if (ingame_count == 0 && exited_count >= 1) {
+        if (exited_count == 1) {
+            /* regola 1: un solo uscito → vince lui */
+            strncpy(winner_nick, best_exited_nick, MAX_NICK_LEN - 1);
+            *winner_score = best_exited_score;
+            *draw = 0;
+        } else {
+            /* regola 2: più usciti → vince chi ha più oggetti */
+            strncpy(winner_nick, best_exited_nick, MAX_NICK_LEN - 1);
+            *winner_score = best_exited_score;
+            *draw = exited_tied;
         }
-    }
-    /* caso 1: tutti i giocatori attivi sono usciti */
-    if (exited_count >= 1 && ingame_count == 0) {
-        strncpy(winner_nick, best_nick, MAX_NICK_LEN - 1);
-        *winner_score = best_score;
-        *draw         = tied;
         return GAME_OVER_EXIT;
     }
 
-    /* caso 2: timeout con almeno un uscito */
-    if (timed_out && exited_count >= 1) {
-        strncpy(winner_nick, best_nick, MAX_NICK_LEN - 1);
-        *winner_score = best_score;
-        *draw         = tied;
-        return GAME_OVER_EXIT;
-    }
-
-    /* caso 3: timeout senza usciti */
+    /* --- condizione: timeout scaduto --- */
     if (timed_out) {
-        best_score = -1; tied = 0;
-        for (int i = 0; i < MAX_PLAYERS; i++) {
-            if (!pt->slots[i].active) continue;
-            if (pt->slots[i].score > best_score) {
-                best_score = pt->slots[i].score;
-                strncpy(best_nick, pt->slots[i].nick, MAX_NICK_LEN - 1);
-                tied = 0;
-            } else if (pt->slots[i].score == best_score) {
-                tied = 1;
-            }
+        if (exited_count == 1) {
+            /* regola 1: un solo uscito → vince lui */
+            strncpy(winner_nick, best_exited_nick, MAX_NICK_LEN - 1);
+            *winner_score = best_exited_score;
+            *draw = 0;
+        } else if (exited_count >= 2) {
+            /* regola 2: più usciti → vince chi ha più oggetti */
+            strncpy(winner_nick, best_exited_nick, MAX_NICK_LEN - 1);
+            *winner_score = best_exited_score;
+            *draw = exited_tied;
+        } else {
+            /* regola 3: nessuno uscito → vince chi ha più oggetti */
+            strncpy(winner_nick, best_any_nick, MAX_NICK_LEN - 1);
+            *winner_score = best_any_score;
+            *draw = any_tied;
         }
-        strncpy(winner_nick, best_nick, MAX_NICK_LEN - 1);
-        *winner_score = best_score;
-        *draw         = tied;
         return GAME_OVER_TIMEOUT;
     }
 
+    /* --- la partita continua --- */
     return GAME_RUNNING;
 }
 
