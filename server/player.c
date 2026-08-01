@@ -49,14 +49,12 @@ void player_reveal(Player *p, int row, int col) {
     }
 }
 
-/* 
-   Mappa locale: finestra (2*VIEW_RADIUS+1) x (2*VIEW_RADIUS+1)
-   centrata sul giocatore. Celle non scoperte → CELL_UNKNOWN.
-   Posizione giocatore → CELL_PLAYER.
-   */
+/* Mappa locale: finestra (2*VIEW_RADIUS+1) x (2*VIEW_RADIUS+1)
+   centrata sul giocatore
+   Celle non scoperte = CELL_UNKNOWN.
+   Posizione giocatore = CELL_PLAYER. */
 void player_local_map(const Player *p, const char maze_grid[][MAZE_COLS],
-                      char *buf, int *out_rows, int *out_cols)
-{
+                      char *buf, int *out_rows, int *out_cols) {
     int dim = 2 * VIEW_RADIUS + 1;
     *out_rows = dim;
     *out_cols = dim;
@@ -82,12 +80,9 @@ void player_local_map(const Player *p, const char maze_grid[][MAZE_COLS],
     buf[idx] = '\0';
 }
 
-/* 
-   Mappa globale: intera matrice, celle non scoperte → CELL_UNKNOWN
- *  */
+// Mappa globale: intera matrice, celle non scoperte = CELL_UNKNOWN
 void player_global_map(const Player *p, const char maze_grid[][MAZE_COLS],
-                       char *buf)
-{
+                       char *buf) {
     int idx = 0;
     for (int r = 0; r < MAZE_ROWS; r++) {
         for (int c = 0; c < MAZE_COLS; c++) {
