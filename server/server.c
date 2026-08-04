@@ -601,9 +601,12 @@ void phase_play(int fd, int player_idx, const char *nick) {
     pthread_mutex_lock(&mutex);
     client_fds[player_idx] = -1;  /* esce dai destinatari del broadcast lobby */
     send_local_map(fd, &pt.slots[player_idx]);
+    time_t start_time = maze.start_time;
     pthread_mutex_unlock(&mutex);
 
     time_t last_global = time(NULL);
+    time_t last_time_msg = 0; /* forza l'invio del primo TIME subito */
+    int exited = 0; /* il giocatore e' uscito dal labirinto mac sta aspettando l'esito */
 
     while (1) {
         pthread_mutex_lock(&mutex);
@@ -617,9 +620,21 @@ void phase_play(int fd, int player_idx, const char *nick) {
         if (check_and_handle_game_end(fd, nick)) return;
 
         time_t now = time(NULL);
+
+        /* invia il tempo rimanente al client una volta al secondo */
+        if (now != last_time_msg) {
+            int remaining_time = (int)GAME_TIMEOUT - (int)(now - start_time);
+            if (remaining_time < 0) remaining_time = 0;
+            char tmsg[32];
+            snprintf(tmsg, sizeof(tmsg), "TIME %d", remaining_time);
+            send_line(fd, tmsg);
+            last_time_msg = now;
+        }
+
         long elapsed = (long)(now - last_global);
         long remaining = (long)GLOBAL_MAP_INTERVAL - elapsed;
         if (remaining <= 0) remaining = 0;
+        if (remaining > 1) remaining = 1; /* sveglia ogni secondo per aggiornare il timer */
 
         struct timeval tv = { .tv_sec = remaining, .tv_usec = 0 };
         fd_set rfds;
@@ -635,10 +650,13 @@ void phase_play(int fd, int player_idx, const char *nick) {
         }
 
         if (ready == 0) {
-            pthread_mutex_lock(&mutex);
-            send_global_map(fd, &pt.slots[player_idx]);
-            pthread_mutex_unlock(&mutex);
-            last_global = time(NULL);
+            long elapsed2 = (long)(time(NULL) - last_global);
+            if (elapsed2 >= GLOBAL_MAP_INTERVAL) {
+                pthread_mutex_lock(&mutex);
+                send_global_map(fd, &pt.slots[player_idx]);
+                pthread_mutex_unlock(&mutex);
+                last_global = time(NULL);
+            }
             if (check_and_handle_game_end(fd, nick)) return;
             continue;
         }
@@ -654,11 +672,26 @@ void phase_play(int fd, int player_idx, const char *nick) {
         }
 
         if (FD_ISSET(fd, &rfds)) {
+            if (exited) {
+                /* il giocatore e' gia' uscito: ignora eventuali comandi extra,
+                   resta solo in attesa dell'esito finale della partita */
+                char line[MAX_MSG_LEN];
+                if (read_line(fd, line, sizeof(line)) <= 0) return;
+                char cmd[16];
+                sscanf(line, "%15s", cmd);
+                if (strcmp(cmd, "QUIT") == 0) { send_line(fd, "OK"); return; }
+                send_line(fd, "ERR sei gia' uscito, attendi il risultato");
+                continue;
+            }
+
             int rc = handle_play_command(fd, player_idx, nick);
             if (rc == 0) return;                 /* disconnesso o QUIT   */
             if (rc == 2) {                        /* uscito dal labirinto */
-                check_and_handle_game_end(fd, nick);
-                return;
+                exited = 1;
+                /* sveglia subito gli altri giocatori per ricontrollare la fine partita */
+                write(notify_pipe[1], "\x01", 1);
+                if (check_and_handle_game_end(fd, nick)) return;
+                continue; /* resta connesso: attende l'esito per mostrare la schermata finale */
             }
             /* rc == 1: comando gestito, si continua il ciclo */
         }

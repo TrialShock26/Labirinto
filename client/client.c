@@ -26,12 +26,12 @@
 #define ANSI_CYAN       "\033[36m"
 #define ANSI_WHITE      "\033[37m"
 #define ANSI_GRAY       "\033[90m"
-#define ANSI_BG_BLACK   ""
-#define ANSI_BG_WHITE   ""
-#define ANSI_BG_BLUE    ""
-#define ANSI_BG_GREEN   ""
-#define ANSI_BG_YELLOW  ""
-#define ANSI_BG_RED     ""
+#define ANSI_BG_BLACK   "\033[40m"
+#define ANSI_BG_WHITE   "\033[47m"
+#define ANSI_BG_BLUE    "\033[44m"
+#define ANSI_BG_GREEN   "\033[42m"
+#define ANSI_BG_YELLOW  "\033[43m"
+#define ANSI_BG_RED     "\033[41m"
 #define ANSI_CLEAR      "\033[2J\033[H"
 #define ANSI_CLEAR_LINE "\033[2K\r"
 
@@ -218,13 +218,13 @@ static void redraw_maps(void) {
             for (int c = 0; c < g_local_cols; c++) {
                 char ch = g_local_data[r * g_local_cols + c];
                 switch (ch) {
-                    case CELL_WALL:    printf(ANSI_BG_WHITE " " SYM_WALL ANSI_RESET);                         break;
-                    case CELL_FREE:    printf(ANSI_BG_BLACK "  " ANSI_RESET);                                  break;
-                    case CELL_OBJECT:  printf(ANSI_BG_BLACK ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET); break;
-                    case CELL_EXIT:    printf(ANSI_BG_GREEN ANSI_WHITE ANSI_BOLD " " SYM_EXIT ANSI_RESET);    break;
-                    case CELL_UNKNOWN: printf(ANSI_BG_BLACK ANSI_GRAY " " SYM_UNKNOWN ANSI_RESET);            break;
-                    case CELL_PLAYER:  printf(ANSI_BG_BLUE ANSI_CYAN ANSI_BOLD " " SYM_PLAYER ANSI_RESET);   break;
-                    default:           printf(ANSI_BG_BLACK " %c" ANSI_RESET, ch);                             break;
+                    case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
+                    case CELL_FREE:    printf("  ");                                                            break;
+                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                break;
+                    case CELL_EXIT:    printf(ANSI_BG_GREEN "  " ANSI_RESET);                                   break;
+                    case CELL_UNKNOWN: printf(" " SYM_UNKNOWN);                                                 break;
+                    case CELL_PLAYER:  printf(" " SYM_PLAYER);                                                  break;
+                    default:           printf(" %c", ch);                                                       break;
                 }
             }
             printf("|     ");
@@ -246,13 +246,13 @@ static void redraw_maps(void) {
             for (int c = 0; c < g_global_cols; c++) {
                 char ch = g_global_data[r * g_global_cols + c];
                 switch (ch) {
-                    case CELL_WALL:    printf(ANSI_BG_WHITE " " SYM_WALL ANSI_RESET);                         break;
-                    case CELL_FREE:    printf(ANSI_BG_BLACK "  " ANSI_RESET);                                  break;
-                    case CELL_OBJECT:  printf(ANSI_BG_BLACK ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET); break;
-                    case CELL_EXIT:    printf(ANSI_BG_GREEN ANSI_WHITE ANSI_BOLD " " SYM_EXIT ANSI_RESET);    break;
-                    case CELL_UNKNOWN: printf(ANSI_BG_BLACK ANSI_GRAY " " SYM_UNKNOWN ANSI_RESET);            break;
-                    case CELL_PLAYER:  printf(ANSI_BG_BLUE ANSI_CYAN ANSI_BOLD " " SYM_PLAYER ANSI_RESET);   break;
-                    default:           printf(ANSI_BG_BLACK " %c" ANSI_RESET, ch);                             break;
+                    case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
+                    case CELL_FREE:    printf("  ");                                                            break;
+                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                break;
+                    case CELL_EXIT:    printf(ANSI_BG_GREEN "  " ANSI_RESET);                                   break;
+                    case CELL_UNKNOWN: printf(" " SYM_UNKNOWN);                                                 break;
+                    case CELL_PLAYER:  printf(" " SYM_PLAYER);                                                  break;
+                    default:           printf(" %c", ch);                                                       break;
                 }
             }
             printf("|");
@@ -281,7 +281,7 @@ static void redraw_maps(void) {
     printf(ANSI_GRAY
            "  legenda: " SYM_WALL "=muro  "
            SYM_OBJECT "=oggetto  "
-           SYM_EXIT   "=uscita  "
+           ANSI_RESET ANSI_BG_GREEN "  " ANSI_RESET ANSI_GRAY "=uscita  "
            SYM_PLAYER "=tu  "
            SYM_UNKNOWN "=inesplorato"
            ANSI_RESET "\n\n");
@@ -435,11 +435,9 @@ static int handle_server_msg(const char *line) {
         int n = 0;
         const char *ptr = line + 5;
         sscanf(ptr, "%d", &n);
-        printf("\n" ANSI_CYAN ANSI_BOLD "  Giocatori connessi (%d):" ANSI_RESET, n);
         while (*ptr && *ptr != ' ') ptr++;
         if (*ptr) ptr++;
-        printf(" %s\n\n", ptr);
-        fflush(stdout);
+        show_msg(ANSI_CYAN ANSI_BOLD "  Giocatori connessi (%d):" ANSI_RESET " %s", n, ptr);
         return 1;
     }
 
@@ -466,7 +464,16 @@ static int authenticate(void) {
 
     printf("  (1) Registrati   (2) Login  > ");
     fflush(stdout);
-    if (!fgets(choice, sizeof(choice), stdin)) return 0;
+    while (1) {
+        if (!fgets(choice, sizeof(choice), stdin)) return 0;
+        choice[strcspn(choice, "\n")] = '\0';
+
+        if (strcmp(choice, "1") == 0 || strcmp(choice, "2") == 0) break;
+
+        printf(ANSI_RED "  Opzione non valida, inserisci 1 o 2\n" ANSI_RESET);
+        printf("  (1) Registrati   (2) Login  > ");
+        fflush(stdout);
+    }
 
     printf("  Nickname: "); fflush(stdout);
     if (!fgets(nick, sizeof(nick), stdin)) return 0;
