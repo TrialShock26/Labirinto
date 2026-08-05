@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -31,6 +32,17 @@ int max_players_ever = 0;
 volatile int game_over = 0; //TODO se funziona togliendo volatile
 int client_fds[MAX_PLAYERS];
 int listen_sd = -1;
+
+/* risultato finale della partita, calcolato UNA SOLA VOLTA (dal primo
+   thread che rileva la fine partita) e poi condiviso con tutti gli altri,
+   cosi' ogni giocatore riceve esattamente lo stesso esito invece di un
+   ricalcolo indipendente che, effettuato in istanti leggermente diversi,
+   potrebbe dare risultati differenti (es. pareggio per uno, vittoria per
+   un altro) */
+static GameStatus g_final_status = GAME_RUNNING;
+static char       g_final_winner[MAX_NICK_LEN] = {0};
+static int        g_final_score  = 0;
+static int        g_final_draw   = 0;
 
 typedef struct {
     int fd;
@@ -508,6 +520,15 @@ int phase_join(int fd, const char *nick) {
         return -1;
     }
 
+    if (pt.count == 0) {
+        /* primo giocatore di una nuova sessione: rigenera il labirinto
+           cosi' maze.start_time riparte da adesso invece di restare
+           legato all'avvio del server o alla partita precedente. Va fatto
+           qui, prima di posizionare chiunque, cosi' nessun giocatore
+           finisce con una posizione calcolata sul vecchio labirinto. */
+        maze_generate(&maze);
+    }
+
     int pr, pc;
     if (!maze_random_free_cell(&maze, &pr, &pc)) {
         pthread_mutex_unlock(&mutex);
@@ -664,11 +685,13 @@ void phase_play(int fd, int player_idx, const char *nick) {
         if (FD_ISSET(notify_pipe[0], &rfds)) {
             char buf[64];
             int n = read(notify_pipe[0], buf, sizeof(buf));
-            for (int i = 0; i < n; i++) {
-                if (buf[i] == 0x01) {
-                    if (check_and_handle_game_end(fd, nick)) return;
-                }
+            if (n > 0) {
+                /* qualcosa e' cambiato (uscita o disconnessione di un
+                   giocatore): ricontrolla se la partita e' finita */
+                if (check_and_handle_game_end(fd, nick)) return;
             }
+            /* n <= 0 (EAGAIN incluso): un altro thread ha gia' consumato
+               il byte di notifica, nulla da fare qui */
         }
 
         if (FD_ISSET(fd, &rfds)) {
@@ -807,11 +830,28 @@ int handle_move_command(int fd, const char *line,
 int check_and_handle_game_end(int fd, const char *nick) {
     char winner[MAX_NICK_LEN];
     int  winner_score, is_draw;
+    GameStatus status;
 
     pthread_mutex_lock(&mutex);
-    GameStatus status = game_check_end(&maze, &pt, winner, &winner_score,
-                                        &is_draw);
-    if (status != GAME_RUNNING) game_over = 1;
+    if (game_over) {
+        /* il risultato e' gia' stato determinato da un altro thread:
+           riusa esattamente lo stesso esito, non ricalcolare */
+        status       = g_final_status;
+        winner_score = g_final_score;
+        is_draw      = g_final_draw;
+        strncpy(winner, g_final_winner, MAX_NICK_LEN - 1);
+        winner[MAX_NICK_LEN - 1] = '\0';
+    } else {
+        status = game_check_end(&maze, &pt, winner, &winner_score, &is_draw);
+        if (status != GAME_RUNNING) {
+            game_over      = 1;
+            g_final_status = status;
+            g_final_score  = winner_score;
+            g_final_draw   = is_draw;
+            strncpy(g_final_winner, winner, MAX_NICK_LEN - 1);
+            g_final_winner[MAX_NICK_LEN - 1] = '\0';
+        }
+    }
     pthread_mutex_unlock(&mutex);
 
     if (status == GAME_RUNNING) return 0;
@@ -832,9 +872,13 @@ void client_cleanup(int fd, int player_idx,
         player_remove(&pt, player_idx);
         broadcast_lobby_update();
         if (pt.count == 0) {
-            ready_count  = 0;
-            game_started = 0;
-            game_over    = 0;
+            ready_count    = 0;
+            game_started   = 0;
+            game_over      = 0;
+            g_final_status = GAME_RUNNING;
+            g_final_winner[0] = '\0';
+            g_final_score  = 0;
+            g_final_draw   = 0;
         }
         pthread_mutex_unlock(&mutex);
 
@@ -886,6 +930,11 @@ int main(int argc, char *argv[]) {
     signal(SIGPIPE, SIG_IGN);
 
     if (pipe(notify_pipe) < 0) { perror("pipe"); return 1; }
+    /* il lato di lettura e' condiviso da tutti i thread dei giocatori: se
+       piu' thread vengono svegliati insieme da select() ma solo uno riesce
+       a leggere il byte, gli altri non devono bloccarsi su read() in attesa
+       di altri dati che potrebbero non arrivare mai */
+    fcntl(notify_pipe[0], F_SETFL, O_NONBLOCK);
 
     while (1) {
         struct sockaddr_in client_addr;

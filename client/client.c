@@ -54,6 +54,8 @@ static int g_in_lobby = 1;
 static int g_ready    = 0;
 
 static int g_time_remaining = GAME_TIMEOUT;
+static char g_persist_msg[256] = {0}; /* messaggio che deve restare visibile anche dopo i redraw della mappa */
+static char g_game_end_msg[900] = {0}; /* schermata finale, stampata dopo l'uscita dallo schermo alternativo */
 
 /*
     per memorizzare la mappa locale per il posizionamento a sinistra
@@ -289,10 +291,18 @@ static void redraw_maps(void) {
     printf(ANSI_BOLD "[w/s/a/d]" ANSI_RESET "=muovi  "
            ANSI_BOLD "[l]" ANSI_RESET "=lista  "
            ANSI_BOLD "[q]" ANSI_RESET "=esci\n");
+
+    if (g_persist_msg[0] != '\0') {
+        printf("\033[32;1H");
+        printf(ANSI_CLEAR_LINE);
+        printf("%s", g_persist_msg);
+    }
+
     fflush(stdout);
 }
 
-/* stampa un messaggio nelle righe 3-4 fisse, senza disturbare la mappa (riga 5+) */
+/* stampa un messaggio nelle righe 32-33 fisse, senza disturbare la mappa,
+   e lo dimentica: sara' cancellato al prossimo redraw della mappa */
 static void show_msg(const char *fmt, ...) {
     printf("\033[32;1H");
     printf(ANSI_CLEAR_LINE);
@@ -303,6 +313,23 @@ static void show_msg(const char *fmt, ...) {
     va_start(ap, fmt);
     vprintf(fmt, ap);
     va_end(ap);
+    fflush(stdout);
+}
+
+/* come show_msg, ma il messaggio resta visibile anche dopo i successivi
+   redraw della mappa (es. arrivo di una nuova mappa GLOBAL) */
+static void show_msg_persist(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(g_persist_msg, sizeof(g_persist_msg), fmt, ap);
+    va_end(ap);
+
+    printf("\033[32;1H");
+    printf(ANSI_CLEAR_LINE);
+    printf("\033[33;1H");
+    printf(ANSI_CLEAR_LINE);
+    printf("\033[32;1H");
+    printf("%s", g_persist_msg);
     fflush(stdout);
 }
 
@@ -399,7 +426,7 @@ static int handle_server_msg(const char *line) {
     
     if (strcmp(cmd, "EXIT_OK") == 0) {
         sscanf(line, "EXIT_OK %d", &g_score);
-        show_msg(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, g_score);
+        show_msg_persist(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, g_score);
         g_exited = 1;
         return 1;
     }
@@ -407,26 +434,34 @@ static int handle_server_msg(const char *line) {
     /* fine partita */
     if (strcmp(cmd, "GAME_END") == 0) {
         const char *payload = line + 9;
-        printf("\n");
-        printf(ANSI_BOLD "╔══════════════════════════════╗\n" ANSI_RESET);
-        printf(ANSI_BOLD "║       FINE PARTITA           ║\n" ANSI_RESET);
-        printf(ANSI_BOLD "╚══════════════════════════════╝\n" ANSI_RESET);
+        char body[400] = {0};
         if (strncmp(payload, "WIN", 3) == 0) {
             char winner[MAX_NICK_LEN]; int score;
             if (sscanf(payload, "WIN %s %d", winner, &score) == 2)
-                printf(ANSI_YELLOW ANSI_BOLD "  🏆 Vincitore: %s  (punteggio: %d)\n"
-                       ANSI_RESET, winner, score);
+                snprintf(body, sizeof(body),
+                         ANSI_YELLOW ANSI_BOLD "  🏆 Vincitore: %s  (punteggio: %d)\n"
+                         ANSI_RESET, winner, score);
         } else if (strncmp(payload, "DRAW", 4) == 0) {
             int score; sscanf(payload, "DRAW %d", &score);
-            printf(ANSI_CYAN ANSI_BOLD "  🤝 Pareggio! Punteggio massimo: %d\n"
-                   ANSI_RESET, score);
+            snprintf(body, sizeof(body),
+                     ANSI_CYAN ANSI_BOLD "  🤝 Pareggio! Punteggio massimo: %d\n"
+                     ANSI_RESET, score);
         } else if (strncmp(payload, "TIMEOUT", 7) == 0) {
-            printf(ANSI_RED ANSI_BOLD "  ⏰ Timeout! Nessun vincitore.\n" ANSI_RESET);
+            snprintf(body, sizeof(body),
+                     ANSI_RED ANSI_BOLD "  ⏰ Timeout! Nessun vincitore.\n" ANSI_RESET);
         } else {
-            printf("  %s\n", payload);
+            snprintf(body, sizeof(body), "  %s\n", payload);
         }
-        printf("\n");
-        fflush(stdout);
+        /* il messaggio viene solo memorizzato: se lo stampassimo ora,
+           saremmo ancora nello schermo alternativo e verrebbe cancellato
+           non appena il programma torna al terminale normale. Il main lo
+           stampera' DOPO l'uscita dallo schermo alternativo, cosi' resta
+           visibile in modo permanente. */
+        snprintf(g_game_end_msg, sizeof(g_game_end_msg),
+                 ANSI_BOLD "\n╔══════════════════════════════╗\n"
+                 "║       FINE PARTITA           ║\n"
+                 "╚══════════════════════════════╝\n" ANSI_RESET
+                 "%s\n", body);
         return 0;
     }
 
@@ -645,6 +680,11 @@ int main(int argc, char *argv[]) {
     disable_raw_mode();
     printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
     fflush(stdout);
+
+    if (g_game_end_msg[0] != '\0') {
+        printf("%s", g_game_end_msg);
+        fflush(stdout);
+    }
 
     close(g_sock);
     return 0;
