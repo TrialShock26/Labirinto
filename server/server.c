@@ -827,6 +827,7 @@ int handle_move_command(int fd, const char *line,
 /* Verifica se la partita e' terminata; se si', invia il messaggio di
  * fine partita al client, logga l'evento e ritorna 1. Se la partita e'
  * ancora in corso ritorna 0. */
+ 
 int check_and_handle_game_end(int fd, const char *nick) {
     char winner[MAX_NICK_LEN];
     int  winner_score, is_draw;

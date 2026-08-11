@@ -52,6 +52,7 @@ static int g_score    = 0;
 static int g_exited   = 0;
 static int g_in_lobby = 1;
 static int g_ready    = 0;
+static char g_nick[MAX_NICK_LEN] = {0};
 
 static int g_time_remaining = GAME_TIMEOUT;
 static char g_persist_msg[256] = {0}; /* messaggio che deve restare visibile anche dopo i redraw della mappa */
@@ -71,13 +72,26 @@ static struct termios g_orig_termios;
 static void send_line(const char *msg) {
     char buf[MAX_MSG_LEN + 2];
     int  n = snprintf(buf, sizeof(buf), "%s\n", msg);
-    write(g_sock, buf, n);
+    int  sent_total = 0;
+
+    /* send() puo' inviare meno byte di quanti richiesti: bisogna
+       ripetere la chiamata finche' non e' stato inviato tutto */
+    while (sent_total < n) {
+        int sent = send(g_sock, buf + sent_total, n - sent_total, 0);
+        if (sent <= 0) {
+            if (sent < 0 && errno == EINTR) continue;
+            perror("send");
+            return;
+        }
+        sent_total += sent;
+    }
 }
 
 static int read_line(int fd, char *buf, int maxlen) {
     int  i = 0; char c;
     while (i < maxlen - 1) {
-        int n = read(fd, &c, 1);
+        int n = recv(fd, &c, 1, 0);
+        if (n < 0 && errno == EINTR) continue;
         if (n <= 0) return -1;
         if (c == '\n') break;
         if (c != '\r') buf[i++] = c;
@@ -124,6 +138,8 @@ static void display_lobby(int ready, int total) {
            "  ║          — LOBBY —               ║\n"
            "  ╚══════════════════════════════════╝\n"
            ANSI_RESET "\n");
+
+    printf("  Utente: " ANSI_BOLD ANSI_CYAN "%s" ANSI_RESET "\n\n", g_nick);
 
     printf("  Giocatori pronti: " ANSI_BOLD ANSI_GREEN "%d" ANSI_RESET
            " / " ANSI_BOLD "%d" ANSI_RESET "\n\n", ready, total);
@@ -188,7 +204,8 @@ static void redraw_maps(void) {
     if (gap < 2) gap = 2;
     for (int i = 0; i < gap; i++) printf(" ");
     printf(ANSI_BOLD "GLOBAL MAP" ANSI_RESET
-           "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n", g_score);
+           "   " ANSI_CYAN "%s" ANSI_RESET
+           "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n", g_nick, g_score);
 
     /* bordo superiore */
     printf("  +");
@@ -540,6 +557,8 @@ static int authenticate(void) {
 
     printf(ANSI_GREEN ANSI_BOLD "\n  Benvenuto, %s!\n" ANSI_RESET, nick);
     fflush(stdout);
+    strncpy(g_nick, nick, sizeof(g_nick) - 1);
+    g_nick[sizeof(g_nick) - 1] = '\0';
     return 1;
 }
 
