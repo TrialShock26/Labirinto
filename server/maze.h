@@ -16,6 +16,7 @@ typedef struct {
     int      winner_pid;        // PID del processo vincitore (o -1)
     char     winner_nick[MAX_NICK_LEN];
     int      winner_score;
+    int      game_started;
     time_t   start_time;
 } Maze;
 
