@@ -47,37 +47,42 @@
 #define ANSI_CURSOR_HIDE    "\033[?25l"  
 #define ANSI_CURSOR_SHOW    "\033[?25h"  
 
-static int g_sock     = -1;
-static int g_score    = 0;
-static int g_exited   = 0;
-static int g_in_lobby = 1;
-static int g_ready    = 0;
-static char g_nick[MAX_NICK_LEN] = {0};
+#define SYM_PLAYER   "\xe1\x8c\xb8"
+#define SYM_WALL     "\xf0\x91\x80\xa9"
+#define SYM_OBJECT   "@"
+#define SYM_EXIT     "E"
+#define SYM_UNKNOWN  "?"
 
-static int g_time_remaining = GAME_TIMEOUT;
-static char g_persist_msg[256] = {0}; /* messaggio che deve restare visibile anche dopo i redraw della mappa */
-static char g_game_end_msg[900] = {0}; /* schermata finale, stampata dopo l'uscita dallo schermo alternativo */
+int sock     = -1;
+int score    = 0;
+int exited   = 0;
+int in_lobby = 1;
+int ready    = 0;
+char nick[MAX_NICK_LEN] = {0};
+
+int time_remaining = GAME_TIMEOUT;
+char persist_msg[256] = {0}; /* messaggio che deve restare visibile anche dopo i redraw della mappa */
+char game_end_msg[900] = {0}; /* schermata finale, stampata dopo l'uscita dallo schermo alternativo */
 
 /*
     per memorizzare la mappa locale per il posizionamento a sinistra
 */
 
-static char g_local_data[MAX_MSG_LEN]         = {0};
-static int  g_local_rows = 0, g_local_cols = 0;
-static char g_global_data[MAZE_ROWS*MAZE_COLS+4] = {0};
-static int  g_global_rows = 0, g_global_cols = 0;
+char local_data[MAX_MSG_LEN]         = {0};
+int  local_rows = 0, local_cols = 0;
+char global_data[MAZE_ROWS*MAZE_COLS+4] = {0};
+int  global_rows = 0, global_cols = 0;
 
-static struct termios g_orig_termios;
+struct termios oritermios;
 
-static void send_line(const char *msg) {
+void send_line(const char *msg) {
     char buf[MAX_MSG_LEN + 2];
     int  n = snprintf(buf, sizeof(buf), "%s\n", msg);
     int  sent_total = 0;
 
-    /* send() puo' inviare meno byte di quanti richiesti: bisogna
-       ripetere la chiamata finche' non e' stato inviato tutto */
+
     while (sent_total < n) {
-        int sent = send(g_sock, buf + sent_total, n - sent_total, 0);
+        int sent = send(sock, buf + sent_total, n - sent_total, 0);
         if (sent <= 0) {
             if (sent < 0 && errno == EINTR) continue;
             perror("send");
@@ -87,7 +92,7 @@ static void send_line(const char *msg) {
     }
 }
 
-static int read_line(int fd, char *buf, int maxlen) {
+int read_line(int fd, char *buf, int maxlen) {
     int  i = 0; char c;
     while (i < maxlen - 1) {
         int n = recv(fd, &c, 1, 0);
@@ -100,17 +105,11 @@ static int read_line(int fd, char *buf, int maxlen) {
     return i;
 }
 
-#define SYM_PLAYER   "\xe1\x8c\xb8"
-#define SYM_WALL     "\xf0\x91\x80\xa9"
-#define SYM_OBJECT   "@"
-#define SYM_EXIT     "E"
-#define SYM_UNKNOWN  "?"
 
-
-static void enable_raw_mode(void) {
+void enable_raw_mode(void) {
     if (!isatty(STDIN_FILENO)) return;
-    tcgetattr(STDIN_FILENO, &g_orig_termios);
-    struct termios raw = g_orig_termios;
+    tcgetattr(STDIN_FILENO, &oritermios);
+    struct termios raw = oritermios;
     raw.c_lflag &= ~(ICANON | ECHO);
     raw.c_iflag &= ~(ICRNL);
     raw.c_cc[VMIN]  = 1;
@@ -118,9 +117,9 @@ static void enable_raw_mode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
-static void disable_raw_mode(void) {
+void disable_raw_mode(void) {
     if (!isatty(STDIN_FILENO)) return;
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_orig_termios);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &oritermios);
 }
 
 
@@ -128,7 +127,7 @@ static void disable_raw_mode(void) {
     visualizzazione lobby pre-partita
 */
 
-static void display_lobby(int ready, int total) {
+void display_lobby(int ready, int total) {
     printf("\033[1;1H");   /* cursore in cima */
     printf("\033[J");       /* cancella tutto sotto */
 
@@ -139,7 +138,7 @@ static void display_lobby(int ready, int total) {
            "  ╚══════════════════════════════════╝\n"
            ANSI_RESET "\n");
 
-    printf("  Utente: " ANSI_BOLD ANSI_CYAN "%s" ANSI_RESET "\n\n", g_nick);
+    printf("  Utente: " ANSI_BOLD ANSI_CYAN "%s" ANSI_RESET "\n\n", nick);
 
     printf("  Giocatori pronti: " ANSI_BOLD ANSI_GREEN "%d" ANSI_RESET
            " / " ANSI_BOLD "%d" ANSI_RESET "\n\n", ready, total);
@@ -155,7 +154,7 @@ static void display_lobby(int ready, int total) {
         printf(ANSI_YELLOW ANSI_BOLD
                "  Tutti pronti! La partita sta per iniziare...\n"
                ANSI_RESET);
-    } else if (!g_ready) {
+    } else if (!ready) {
         printf(ANSI_GRAY
                "  In attesa dei giocatori...\n"
                "  Premi " ANSI_RESET ANSI_BOLD "[r]" ANSI_RESET ANSI_GRAY
@@ -174,17 +173,17 @@ static void display_lobby(int ready, int total) {
 */
 
 /*
-static void display_map(const char *type, int rows, int cols, const char *data) {
+void display_map(const char *type, int rows, int cols, const char *data) {
     ...
 }
 */
 
 
 /* ridisegna entrambe le mappe affiancate, sempre alla stessa posizione */
-static void redraw_maps(void) {
-    if (g_local_rows == 0 && g_global_rows == 0) return;
+void redraw_maps(void) {
+    if (local_rows == 0 && global_rows == 0) return;
 
-    int local_width = g_local_cols * 2 + 4;
+    int local_width = local_cols * 2 + 4;
 
 
     printf("\033[5;1H");
@@ -192,11 +191,11 @@ static void redraw_maps(void) {
 
     /* intestazioni */
     printf(ANSI_BOLD "  LOCAL MAP" ANSI_RESET);
-    int min = g_time_remaining / 60;
-    int sec = g_time_remaining % 60;
-    if (g_time_remaining <= 30)
+    int min = time_remaining / 60;
+    int sec = time_remaining % 60;
+    if (time_remaining <= 30)
         printf(ANSI_RED ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
-    else if (g_time_remaining <= 60)
+    else if (time_remaining <= 60)
         printf(ANSI_YELLOW ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
     else
         printf(ANSI_GREEN ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
@@ -205,27 +204,27 @@ static void redraw_maps(void) {
     for (int i = 0; i < gap; i++) printf(" ");
     printf(ANSI_BOLD "GLOBAL MAP" ANSI_RESET
            "   " ANSI_CYAN "%s" ANSI_RESET
-           "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n", g_nick, g_score);
+           "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n", nick, score);
 
     /* bordo superiore */
     printf("  +");
-    for (int c = 0; c < g_local_cols; c++) printf("--");
+    for (int c = 0; c < local_cols; c++) printf("--");
     printf("+");
     printf("     +");
-    for (int c = 0; c < g_global_cols; c++) printf("--");
+    for (int c = 0; c < global_cols; c++) printf("--");
     printf("+\n");
 
-    int max_rows = g_global_rows > g_local_rows ? g_global_rows : g_local_rows;
+    int max_rows = global_rows > local_rows ? global_rows : local_rows;
     int local_done  = 0;
     int global_done = 0;
 
     for (int r = 0; r < max_rows; r++) {
 
         /* --- lato sinistro: mappa locale --- */
-        if (!local_done && r == g_local_rows) {
+        if (!local_done && r == local_rows) {
             /* chiudi il bordo locale */
             printf("  +");
-            for (int c = 0; c < g_local_cols; c++) printf("--");
+            for (int c = 0; c < local_cols; c++) printf("--");
             printf("+");
             local_done = 1;
             printf("     ");
@@ -234,12 +233,12 @@ static void redraw_maps(void) {
             for (int i = 0; i < local_width + 5; i++) printf(" ");
         } else {
             printf("  |");
-            for (int c = 0; c < g_local_cols; c++) {
-                char ch = g_local_data[r * g_local_cols + c];
+            for (int c = 0; c < local_cols; c++) {
+                char ch = local_data[r * local_cols + c];
                 switch (ch) {
                     case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
                     case CELL_FREE:    printf("  ");                                                            break;
-                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                break;
+                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                 break;
                     case CELL_EXIT:    printf(ANSI_BG_GREEN "  " ANSI_RESET);                                   break;
                     case CELL_UNKNOWN: printf(" " SYM_UNKNOWN);                                                 break;
                     case CELL_PLAYER:  printf(" " SYM_PLAYER);                                                  break;
@@ -250,20 +249,20 @@ static void redraw_maps(void) {
         }
 
         /* --- lato destro: mappa globale --- */
-        if (!global_done && r == g_global_rows) {
+        if (!global_done && r == global_rows) {
             /* chiudi il bordo globale */
             printf("+");
-            for (int c = 0; c < g_global_cols; c++) printf("--");
+            for (int c = 0; c < global_cols; c++) printf("--");
             printf("+");
             global_done = 1;
         } else if (global_done) {
             /* spazio vuoto dove la globale è già finita */
-            int global_width = g_global_cols * 2 + 2;
+            int global_width = global_cols * 2 + 2;
             for (int i = 0; i < global_width; i++) printf(" ");
         } else {
             printf("|");
-            for (int c = 0; c < g_global_cols; c++) {
-                char ch = g_global_data[r * g_global_cols + c];
+            for (int c = 0; c < global_cols; c++) {
+                char ch = global_data[r * global_cols + c];
                 switch (ch) {
                     case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
                     case CELL_FREE:    printf("  ");                                                            break;
@@ -283,7 +282,7 @@ static void redraw_maps(void) {
     /* bordi inferiori se non già stampati nel loop */
     if (!local_done) {
         printf("  +");
-        for (int c = 0; c < g_local_cols; c++) printf("--");
+        for (int c = 0; c < local_cols; c++) printf("--");
         printf("+     ");
     } else {
         for (int i = 0; i < local_width + 5; i++) printf(" ");
@@ -291,7 +290,7 @@ static void redraw_maps(void) {
 
     if (!global_done) {
         printf("+");
-        for (int c = 0; c < g_global_cols; c++) printf("--");
+        for (int c = 0; c < global_cols; c++) printf("--");
         printf("+\n");
     } else {
         printf("\n");
@@ -309,10 +308,10 @@ static void redraw_maps(void) {
            ANSI_BOLD "[l]" ANSI_RESET "=lista  "
            ANSI_BOLD "[q]" ANSI_RESET "=esci\n");
 
-    if (g_persist_msg[0] != '\0') {
+    if (persist_msg[0] != '\0') {
         printf("\033[32;1H");
         printf(ANSI_CLEAR_LINE);
-        printf("%s", g_persist_msg);
+        printf("%s", persist_msg);
     }
 
     fflush(stdout);
@@ -320,7 +319,7 @@ static void redraw_maps(void) {
 
 /* stampa un messaggio nelle righe 32-33 fisse, senza disturbare la mappa,
    e lo dimentica: sara' cancellato al prossimo redraw della mappa */
-static void show_msg(const char *fmt, ...) {
+void show_msg(const char *fmt, ...) {
     printf("\033[32;1H");
     printf(ANSI_CLEAR_LINE);
     printf("\033[33;1H");
@@ -335,10 +334,10 @@ static void show_msg(const char *fmt, ...) {
 
 /* come show_msg, ma il messaggio resta visibile anche dopo i successivi
    redraw della mappa (es. arrivo di una nuova mappa GLOBAL) */
-static void show_msg_persist(const char *fmt, ...) {
+void show_mspersist(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(g_persist_msg, sizeof(g_persist_msg), fmt, ap);
+    vsnprintf(persist_msg, sizeof(persist_msg), fmt, ap);
     va_end(ap);
 
     printf("\033[32;1H");
@@ -346,13 +345,12 @@ static void show_msg_persist(const char *fmt, ...) {
     printf("\033[33;1H");
     printf(ANSI_CLEAR_LINE);
     printf("\033[32;1H");
-    printf("%s", g_persist_msg);
+    printf("%s", persist_msg);
     fflush(stdout);
 }
 
 
-
-static int handle_server_msg(const char *line) {
+int handle_server_msg(const char *line) {
     char cmd[16];
     sscanf(line, "%15s", cmd);
 
@@ -366,7 +364,7 @@ static int handle_server_msg(const char *line) {
     }
 
     if (strcmp(cmd, "START") == 0) {
-        g_in_lobby = 0;
+        in_lobby = 0;
         printf(ANSI_CLEAR);
         printf(ANSI_GREEN ANSI_BOLD
                "\n  ╔══════════════════════════════════╗\n"
@@ -382,14 +380,14 @@ static int handle_server_msg(const char *line) {
         fflush(stdout);
         /* legge subito LOCAL che il server manda immediatamente dopo START */
         char next[MAX_MSG_LEN];
-        if (read_line(g_sock, next, sizeof(next)) > 0)
+        if (read_line(sock, next, sizeof(next)) > 0)
             handle_server_msg(next);
         return 1;
     }
 
 
     /* messaggi di gioco ignorati se ancora in lobby */
-    if (g_in_lobby) {
+    if (in_lobby) {
         if (strcmp(cmd, "ERR") == 0) {
         show_msg(ANSI_RED "  [!] %s" ANSI_RESET, line + 4);
         return 1;
@@ -399,7 +397,7 @@ static int handle_server_msg(const char *line) {
     /* mappa locale */
     if (strcmp(cmd, "LOCAL") == 0) {
     if (sscanf(line, "LOCAL %d %d %s",
-               &g_local_rows, &g_local_cols, g_local_data) == 3)
+               &local_rows, &local_cols, local_data) == 3)
         redraw_maps();
     return 1;
     }
@@ -408,7 +406,7 @@ static int handle_server_msg(const char *line) {
 
     if (strcmp(cmd, "GLOBAL") == 0) {
         if (sscanf(line, "GLOBAL %d %d %s",
-                &g_global_rows, &g_global_cols, g_global_data) == 3)
+                &global_rows, &global_cols, global_data) == 3)
             redraw_maps();
         return 1;
     }
@@ -417,13 +415,13 @@ static int handle_server_msg(const char *line) {
     if (strcmp(cmd, "TIME") == 0) {
         int t = 0;
         sscanf(line, "TIME %d", &t);
-        g_time_remaining = t;
-        int min = g_time_remaining / 60;
-        int sec = g_time_remaining % 60;
+        time_remaining = t;
+        int min = time_remaining / 60;
+        int sec = time_remaining % 60;
         printf("\033[5;12H");   /* riga 5, col 12 (subito dopo "  LOCAL MAP") */
-        if (g_time_remaining <= 30)
+        if (time_remaining <= 30)
             printf(ANSI_RED ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
-        else if (g_time_remaining <= 60)
+        else if (time_remaining <= 60)
             printf(ANSI_YELLOW ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
         else
             printf(ANSI_GREEN ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
@@ -434,17 +432,17 @@ static int handle_server_msg(const char *line) {
     /* raccolta oggetto */
 
     if (strcmp(cmd, "COLLECT") == 0) {
-        sscanf(line, "COLLECT %d", &g_score);
-        show_msg(ANSI_YELLOW ANSI_BOLD "  ★ Oggetto raccolto! Punteggio: %d" ANSI_RESET, g_score);
+        sscanf(line, "COLLECT %d", &score);
+        show_msg(ANSI_YELLOW ANSI_BOLD "  ★ Oggetto raccolto! Punteggio: %d" ANSI_RESET, score);
         return 1;
     }
 
     /* uscita */
     
     if (strcmp(cmd, "EXIT_OK") == 0) {
-        sscanf(line, "EXIT_OK %d", &g_score);
-        show_msg_persist(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, g_score);
-        g_exited = 1;
+        sscanf(line, "EXIT_OK %d", &score);
+        show_mspersist(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, score);
+        exited = 1;
         return 1;
     }
 
@@ -474,7 +472,7 @@ static int handle_server_msg(const char *line) {
            non appena il programma torna al terminale normale. Il main lo
            stampera' DOPO l'uscita dallo schermo alternativo, cosi' resta
            visibile in modo permanente. */
-        snprintf(g_game_end_msg, sizeof(g_game_end_msg),
+        snprintf(game_end_msg, sizeof(game_end_msg),
                  ANSI_BOLD "\n╔══════════════════════════════╗\n"
                  "║       FINE PARTITA           ║\n"
                  "╚══════════════════════════════╝\n" ANSI_RESET
@@ -506,7 +504,7 @@ static int handle_server_msg(const char *line) {
 }
 
 
-static int authenticate(void) {
+int authenticate(void) {
     char choice[8], nick[MAX_NICK_LEN], pass[MAX_PASS_LEN];
     char buf[MAX_MSG_LEN], msg[MAX_MSG_LEN];
 
@@ -541,7 +539,7 @@ static int authenticate(void) {
         snprintf(msg, sizeof(msg), "LOGIN %s %s", nick, pass);
 
     send_line(msg);
-    if (read_line(g_sock, buf, sizeof(buf)) < 0) return 0;
+    if (read_line(sock, buf, sizeof(buf)) < 0) return 0;
     if (strncmp(buf, "OK", 2) != 0) {
         printf(ANSI_RED "  Errore: %s\n" ANSI_RESET, buf); return 0;
     }
@@ -549,7 +547,7 @@ static int authenticate(void) {
     if (choice[0] == '1') {
         snprintf(msg, sizeof(msg), "LOGIN %s %s", nick, pass);
         send_line(msg);
-        if (read_line(g_sock, buf, sizeof(buf)) < 0) return 0;
+        if (read_line(sock, buf, sizeof(buf)) < 0) return 0;
         if (strncmp(buf, "OK", 2) != 0) {
             printf(ANSI_RED "  Login fallito: %s\n" ANSI_RESET, buf); return 0;
         }
@@ -557,12 +555,12 @@ static int authenticate(void) {
 
     printf(ANSI_GREEN ANSI_BOLD "\n  Benvenuto, %s!\n" ANSI_RESET, nick);
     fflush(stdout);
-    strncpy(g_nick, nick, sizeof(g_nick) - 1);
-    g_nick[sizeof(g_nick) - 1] = '\0';
+    strncpy(nick, nick, sizeof(nick) - 1);
+    nick[sizeof(nick) - 1] = '\0';
     return 1;
 }
 
-static void game_loop(void) {
+void game_loop(void) {
     char line[MAX_MSG_LEN];
     int  running = 1;
 
@@ -572,8 +570,8 @@ static void game_loop(void) {
         fd_set fds;
         FD_ZERO(&fds);
         FD_SET(STDIN_FILENO, &fds);
-        FD_SET(g_sock, &fds);
-        int maxfd = g_sock + 1;
+        FD_SET(sock, &fds);
+        int maxfd = sock + 1;
 
         int ready = select(maxfd, &fds, NULL, NULL, NULL);
         if (ready < 0) {
@@ -581,8 +579,8 @@ static void game_loop(void) {
             perror("select"); break;
         }
 
-        if (FD_ISSET(g_sock, &fds)) {
-            if (read_line(g_sock, line, sizeof(line)) < 0) {
+        if (FD_ISSET(sock, &fds)) {
+            if (read_line(sock, line, sizeof(line)) < 0) {
                 printf(ANSI_RED "\n  Connessione chiusa dal server.\n" ANSI_RESET);
                 break;
             }
@@ -609,12 +607,12 @@ static void game_loop(void) {
             /* ignora Invio e altri caratteri di controllo */
             if (ch == '\n' || ch == '\r') continue;
 
-            if (g_in_lobby) {
+            if (in_lobby) {
                 switch (ch) {
                     case 'r':
-                        if (!g_ready) {
+                        if (!ready) {
                             send_line("READY");
-                            g_ready = 1;
+                            ready = 1;
                             show_msg(ANSI_GREEN "  Sei pronto! In attesa degli altri..." ANSI_RESET);
                         } else {
                             show_msg(ANSI_GRAY "  Hai già dichiarato di essere pronto." ANSI_RESET);
@@ -627,7 +625,7 @@ static void game_loop(void) {
                         break;
                 }
             } else {
-                if (g_exited && (ch == 'w' || ch == 's' ||
+                if (exited && (ch == 'w' || ch == 's' ||
                                  ch == 'a' || ch == 'd')) {
                     show_msg(ANSI_GRAY "  Sei già uscito, attendi il risultato..." ANSI_RESET);
                     continue;
@@ -648,7 +646,7 @@ static void game_loop(void) {
     }
 }
 
-static void cleanup_terminal(int sig) {
+void cleanup_terminal(int sig) {
     disable_raw_mode();
     printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
     fflush(stdout);
@@ -669,8 +667,8 @@ int main(int argc, char *argv[]) {
     struct hostent *he = gethostbyname(host);
     if (!he) { herror("gethostbyname"); return 1; }
 
-    g_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (g_sock < 0) { perror("socket"); return 1; }
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) { perror("socket"); return 1; }
 
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
@@ -678,13 +676,13 @@ int main(int argc, char *argv[]) {
     server_addr.sin_port   = htons(port);
     memcpy(&server_addr.sin_addr, he->h_addr_list[0], he->h_length);
 
-    if (connect(g_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("connect"); return 1;
     }
 
     printf(ANSI_CYAN "  Connesso a %s:%d\n" ANSI_RESET, host, port);
 
-    if (!authenticate()) { close(g_sock); return 1; }
+    if (!authenticate()) { close(sock); return 1; }
 
     signal(SIGINT,  cleanup_terminal);
     signal(SIGTERM, cleanup_terminal);
@@ -700,11 +698,11 @@ int main(int argc, char *argv[]) {
     printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
     fflush(stdout);
 
-    if (g_game_end_msg[0] != '\0') {
-        printf("%s", g_game_end_msg);
+    if (game_end_msg[0] != '\0') {
+        printf("%s", game_end_msg);
         fflush(stdout);
     }
 
-    close(g_sock);
+    close(sock);
     return 0;
 }
