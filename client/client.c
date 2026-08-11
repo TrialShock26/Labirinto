@@ -26,12 +26,12 @@
 #define ANSI_CYAN       "\033[36m"
 #define ANSI_WHITE      "\033[37m"
 #define ANSI_GRAY       "\033[90m"
-#define ANSI_BG_BLACK   ""
-#define ANSI_BG_WHITE   ""
-#define ANSI_BG_BLUE    ""
-#define ANSI_BG_GREEN   ""
-#define ANSI_BG_YELLOW  ""
-#define ANSI_BG_RED     ""
+#define ANSI_BG_BLACK   "\033[40m"
+#define ANSI_BG_WHITE   "\033[47m"
+#define ANSI_BG_BLUE    "\033[44m"
+#define ANSI_BG_GREEN   "\033[42m"
+#define ANSI_BG_YELLOW  "\033[43m"
+#define ANSI_BG_RED     "\033[41m"
 #define ANSI_CLEAR      "\033[2J\033[H"
 #define ANSI_CLEAR_LINE "\033[2K\r"
 
@@ -52,8 +52,11 @@ static int g_score    = 0;
 static int g_exited   = 0;
 static int g_in_lobby = 1;
 static int g_ready    = 0;
+static char g_nick[MAX_NICK_LEN] = {0};
 
 static int g_time_remaining = GAME_TIMEOUT;
+static char g_persist_msg[256] = {0}; /* messaggio che deve restare visibile anche dopo i redraw della mappa */
+static char g_game_end_msg[900] = {0}; /* schermata finale, stampata dopo l'uscita dallo schermo alternativo */
 
 /*
     per memorizzare la mappa locale per il posizionamento a sinistra
@@ -69,13 +72,26 @@ static struct termios g_orig_termios;
 static void send_line(const char *msg) {
     char buf[MAX_MSG_LEN + 2];
     int  n = snprintf(buf, sizeof(buf), "%s\n", msg);
-    write(g_sock, buf, n);
+    int  sent_total = 0;
+
+    /* send() puo' inviare meno byte di quanti richiesti: bisogna
+       ripetere la chiamata finche' non e' stato inviato tutto */
+    while (sent_total < n) {
+        int sent = send(g_sock, buf + sent_total, n - sent_total, 0);
+        if (sent <= 0) {
+            if (sent < 0 && errno == EINTR) continue;
+            perror("send");
+            return;
+        }
+        sent_total += sent;
+    }
 }
 
 static int read_line(int fd, char *buf, int maxlen) {
     int  i = 0; char c;
     while (i < maxlen - 1) {
-        int n = read(fd, &c, 1);
+        int n = recv(fd, &c, 1, 0);
+        if (n < 0 && errno == EINTR) continue;
         if (n <= 0) return -1;
         if (c == '\n') break;
         if (c != '\r') buf[i++] = c;
@@ -122,6 +138,8 @@ static void display_lobby(int ready, int total) {
            "  ║          — LOBBY —               ║\n"
            "  ╚══════════════════════════════════╝\n"
            ANSI_RESET "\n");
+
+    printf("  Utente: " ANSI_BOLD ANSI_CYAN "%s" ANSI_RESET "\n\n", g_nick);
 
     printf("  Giocatori pronti: " ANSI_BOLD ANSI_GREEN "%d" ANSI_RESET
            " / " ANSI_BOLD "%d" ANSI_RESET "\n\n", ready, total);
@@ -186,7 +204,8 @@ static void redraw_maps(void) {
     if (gap < 2) gap = 2;
     for (int i = 0; i < gap; i++) printf(" ");
     printf(ANSI_BOLD "GLOBAL MAP" ANSI_RESET
-           "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n", g_score);
+           "   " ANSI_CYAN "%s" ANSI_RESET
+           "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n", g_nick, g_score);
 
     /* bordo superiore */
     printf("  +");
@@ -218,13 +237,13 @@ static void redraw_maps(void) {
             for (int c = 0; c < g_local_cols; c++) {
                 char ch = g_local_data[r * g_local_cols + c];
                 switch (ch) {
-                    case CELL_WALL:    printf(ANSI_BG_WHITE " " SYM_WALL ANSI_RESET);                         break;
-                    case CELL_FREE:    printf(ANSI_BG_BLACK "  " ANSI_RESET);                                  break;
-                    case CELL_OBJECT:  printf(ANSI_BG_BLACK ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET); break;
-                    case CELL_EXIT:    printf(ANSI_BG_GREEN ANSI_WHITE ANSI_BOLD " " SYM_EXIT ANSI_RESET);    break;
-                    case CELL_UNKNOWN: printf(ANSI_BG_BLACK ANSI_GRAY " " SYM_UNKNOWN ANSI_RESET);            break;
-                    case CELL_PLAYER:  printf(ANSI_BG_BLUE ANSI_CYAN ANSI_BOLD " " SYM_PLAYER ANSI_RESET);   break;
-                    default:           printf(ANSI_BG_BLACK " %c" ANSI_RESET, ch);                             break;
+                    case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
+                    case CELL_FREE:    printf("  ");                                                            break;
+                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                break;
+                    case CELL_EXIT:    printf(ANSI_BG_GREEN "  " ANSI_RESET);                                   break;
+                    case CELL_UNKNOWN: printf(" " SYM_UNKNOWN);                                                 break;
+                    case CELL_PLAYER:  printf(" " SYM_PLAYER);                                                  break;
+                    default:           printf(" %c", ch);                                                       break;
                 }
             }
             printf("|     ");
@@ -246,13 +265,13 @@ static void redraw_maps(void) {
             for (int c = 0; c < g_global_cols; c++) {
                 char ch = g_global_data[r * g_global_cols + c];
                 switch (ch) {
-                    case CELL_WALL:    printf(ANSI_BG_WHITE " " SYM_WALL ANSI_RESET);                         break;
-                    case CELL_FREE:    printf(ANSI_BG_BLACK "  " ANSI_RESET);                                  break;
-                    case CELL_OBJECT:  printf(ANSI_BG_BLACK ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET); break;
-                    case CELL_EXIT:    printf(ANSI_BG_GREEN ANSI_WHITE ANSI_BOLD " " SYM_EXIT ANSI_RESET);    break;
-                    case CELL_UNKNOWN: printf(ANSI_BG_BLACK ANSI_GRAY " " SYM_UNKNOWN ANSI_RESET);            break;
-                    case CELL_PLAYER:  printf(ANSI_BG_BLUE ANSI_CYAN ANSI_BOLD " " SYM_PLAYER ANSI_RESET);   break;
-                    default:           printf(ANSI_BG_BLACK " %c" ANSI_RESET, ch);                             break;
+                    case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
+                    case CELL_FREE:    printf("  ");                                                            break;
+                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                break;
+                    case CELL_EXIT:    printf(ANSI_BG_GREEN "  " ANSI_RESET);                                   break;
+                    case CELL_UNKNOWN: printf(" " SYM_UNKNOWN);                                                 break;
+                    case CELL_PLAYER:  printf(" " SYM_PLAYER);                                                  break;
+                    default:           printf(" %c", ch);                                                       break;
                 }
             }
             printf("|");
@@ -281,7 +300,7 @@ static void redraw_maps(void) {
     printf(ANSI_GRAY
            "  legenda: " SYM_WALL "=muro  "
            SYM_OBJECT "=oggetto  "
-           SYM_EXIT   "=uscita  "
+           ANSI_RESET ANSI_BG_GREEN "  " ANSI_RESET ANSI_GRAY "=uscita  "
            SYM_PLAYER "=tu  "
            SYM_UNKNOWN "=inesplorato"
            ANSI_RESET "\n\n");
@@ -289,10 +308,18 @@ static void redraw_maps(void) {
     printf(ANSI_BOLD "[w/s/a/d]" ANSI_RESET "=muovi  "
            ANSI_BOLD "[l]" ANSI_RESET "=lista  "
            ANSI_BOLD "[q]" ANSI_RESET "=esci\n");
+
+    if (g_persist_msg[0] != '\0') {
+        printf("\033[32;1H");
+        printf(ANSI_CLEAR_LINE);
+        printf("%s", g_persist_msg);
+    }
+
     fflush(stdout);
 }
 
-/* stampa un messaggio nelle righe 3-4 fisse, senza disturbare la mappa (riga 5+) */
+/* stampa un messaggio nelle righe 32-33 fisse, senza disturbare la mappa,
+   e lo dimentica: sara' cancellato al prossimo redraw della mappa */
 static void show_msg(const char *fmt, ...) {
     printf("\033[32;1H");
     printf(ANSI_CLEAR_LINE);
@@ -303,6 +330,23 @@ static void show_msg(const char *fmt, ...) {
     va_start(ap, fmt);
     vprintf(fmt, ap);
     va_end(ap);
+    fflush(stdout);
+}
+
+/* come show_msg, ma il messaggio resta visibile anche dopo i successivi
+   redraw della mappa (es. arrivo di una nuova mappa GLOBAL) */
+static void show_msg_persist(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(g_persist_msg, sizeof(g_persist_msg), fmt, ap);
+    va_end(ap);
+
+    printf("\033[32;1H");
+    printf(ANSI_CLEAR_LINE);
+    printf("\033[33;1H");
+    printf(ANSI_CLEAR_LINE);
+    printf("\033[32;1H");
+    printf("%s", g_persist_msg);
     fflush(stdout);
 }
 
@@ -399,7 +443,7 @@ static int handle_server_msg(const char *line) {
     
     if (strcmp(cmd, "EXIT_OK") == 0) {
         sscanf(line, "EXIT_OK %d", &g_score);
-        show_msg(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, g_score);
+        show_msg_persist(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, g_score);
         g_exited = 1;
         return 1;
     }
@@ -407,26 +451,34 @@ static int handle_server_msg(const char *line) {
     /* fine partita */
     if (strcmp(cmd, "GAME_END") == 0) {
         const char *payload = line + 9;
-        printf("\n");
-        printf(ANSI_BOLD "╔══════════════════════════════╗\n" ANSI_RESET);
-        printf(ANSI_BOLD "║       FINE PARTITA           ║\n" ANSI_RESET);
-        printf(ANSI_BOLD "╚══════════════════════════════╝\n" ANSI_RESET);
+        char body[400] = {0};
         if (strncmp(payload, "WIN", 3) == 0) {
             char winner[MAX_NICK_LEN]; int score;
             if (sscanf(payload, "WIN %s %d", winner, &score) == 2)
-                printf(ANSI_YELLOW ANSI_BOLD "  🏆 Vincitore: %s  (punteggio: %d)\n"
-                       ANSI_RESET, winner, score);
+                snprintf(body, sizeof(body),
+                         ANSI_YELLOW ANSI_BOLD "  🏆 Vincitore: %s  (punteggio: %d)\n"
+                         ANSI_RESET, winner, score);
         } else if (strncmp(payload, "DRAW", 4) == 0) {
             int score; sscanf(payload, "DRAW %d", &score);
-            printf(ANSI_CYAN ANSI_BOLD "  🤝 Pareggio! Punteggio massimo: %d\n"
-                   ANSI_RESET, score);
+            snprintf(body, sizeof(body),
+                     ANSI_CYAN ANSI_BOLD "  🤝 Pareggio! Punteggio massimo: %d\n"
+                     ANSI_RESET, score);
         } else if (strncmp(payload, "TIMEOUT", 7) == 0) {
-            printf(ANSI_RED ANSI_BOLD "  ⏰ Timeout! Nessun vincitore.\n" ANSI_RESET);
+            snprintf(body, sizeof(body),
+                     ANSI_RED ANSI_BOLD "  ⏰ Timeout! Nessun vincitore.\n" ANSI_RESET);
         } else {
-            printf("  %s\n", payload);
+            snprintf(body, sizeof(body), "  %s\n", payload);
         }
-        printf("\n");
-        fflush(stdout);
+        /* il messaggio viene solo memorizzato: se lo stampassimo ora,
+           saremmo ancora nello schermo alternativo e verrebbe cancellato
+           non appena il programma torna al terminale normale. Il main lo
+           stampera' DOPO l'uscita dallo schermo alternativo, cosi' resta
+           visibile in modo permanente. */
+        snprintf(g_game_end_msg, sizeof(g_game_end_msg),
+                 ANSI_BOLD "\n╔══════════════════════════════╗\n"
+                 "║       FINE PARTITA           ║\n"
+                 "╚══════════════════════════════╝\n" ANSI_RESET
+                 "%s\n", body);
         return 0;
     }
 
@@ -435,11 +487,9 @@ static int handle_server_msg(const char *line) {
         int n = 0;
         const char *ptr = line + 5;
         sscanf(ptr, "%d", &n);
-        printf("\n" ANSI_CYAN ANSI_BOLD "  Giocatori connessi (%d):" ANSI_RESET, n);
         while (*ptr && *ptr != ' ') ptr++;
         if (*ptr) ptr++;
-        printf(" %s\n\n", ptr);
-        fflush(stdout);
+        show_msg(ANSI_CYAN ANSI_BOLD "  Giocatori connessi (%d):" ANSI_RESET " %s", n, ptr);
         return 1;
     }
 
@@ -466,7 +516,16 @@ static int authenticate(void) {
 
     printf("  (1) Registrati   (2) Login  > ");
     fflush(stdout);
-    if (!fgets(choice, sizeof(choice), stdin)) return 0;
+    while (1) {
+        if (!fgets(choice, sizeof(choice), stdin)) return 0;
+        choice[strcspn(choice, "\n")] = '\0';
+
+        if (strcmp(choice, "1") == 0 || strcmp(choice, "2") == 0) break;
+
+        printf(ANSI_RED "  Opzione non valida, inserisci 1 o 2\n" ANSI_RESET);
+        printf("  (1) Registrati   (2) Login  > ");
+        fflush(stdout);
+    }
 
     printf("  Nickname: "); fflush(stdout);
     if (!fgets(nick, sizeof(nick), stdin)) return 0;
@@ -498,6 +557,8 @@ static int authenticate(void) {
 
     printf(ANSI_GREEN ANSI_BOLD "\n  Benvenuto, %s!\n" ANSI_RESET, nick);
     fflush(stdout);
+    strncpy(g_nick, nick, sizeof(g_nick) - 1);
+    g_nick[sizeof(g_nick) - 1] = '\0';
     return 1;
 }
 
@@ -638,6 +699,11 @@ int main(int argc, char *argv[]) {
     disable_raw_mode();
     printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
     fflush(stdout);
+
+    if (g_game_end_msg[0] != '\0') {
+        printf("%s", g_game_end_msg);
+        fflush(stdout);
+    }
 
     close(g_sock);
     return 0;
