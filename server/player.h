@@ -15,8 +15,9 @@ typedef struct {
 } Player;
 
 typedef struct {
-    Player slots[MAX_PLAYERS];
-    int count;
+   Player slots[MAX_PLAYERS];
+   int count;
+   int ready_count;
 } PlayerTable;
 
 // Cerca il primo slot libero e lo inizializza
@@ -32,14 +33,11 @@ int  player_find_by_tid(const PlayerTable *pt, pthread_t tid);
 void player_reveal(Player *p, int row, int col);
 
 /* Costruisce la stringa della mappa locale (finestra centrata sul giocatore)
-  buf deve essere almeno (2*VIEW_RADIUS+1)^2 + 1 byte
-  Restituisce righe e colonne effettive. */
-void player_local_map(const Player *p, const char maze_grid[][MAZE_COLS],
-                      char *buf, int *out_rows, int *out_cols);
+   buf deve essere almeno (2*VIEW_RADIUS+1)^2 + 1 byte */
+void player_local_map(const Player *p, const char maze_grid[][MAZE_COLS], char *buf);
 
 /* Costruisce la stringa della mappa globale mascherata
-  buf deve essere almeno MAZE_ROWS*MAZE_COLS + 1 byte */
-void player_global_map(const Player *p, const char maze_grid[][MAZE_COLS],
-                       char *buf);
+   buf deve essere almeno MAZE_ROWS*MAZE_COLS + 1 byte */
+void player_global_map(const Player *p, const char maze_grid[][MAZE_COLS], char *buf);
 
 #endif
