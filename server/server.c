@@ -5,7 +5,6 @@
 #include <signal.h>
 #include <time.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -28,17 +27,6 @@ int notify_pipe[2] = {-1, -1};
 volatile int game_over = 0; //TODO se funziona togliendo volatile - magic numbers
 int client_fds[MAX_PLAYERS];
 int listen_sd = -1;
-
-/* risultato finale della partita, calcolato UNA SOLA VOLTA (dal primo
-   thread che rileva la fine partita) e poi condiviso con tutti gli altri,
-   cosi' ogni giocatore riceve esattamente lo stesso esito invece di un
-   ricalcolo indipendente che, effettuato in istanti leggermente diversi,
-   potrebbe dare risultati differenti (es. pareggio per uno, vittoria per
-   un altro) */
-static GameStatus g_final_status = GAME_RUNNING;
-static char       g_final_winner[MAX_NICK_LEN] = {0};
-static int        g_final_score  = 0;
-static int        g_final_draw   = 0;
 
 typedef struct {
     int fd;
@@ -418,12 +406,9 @@ void phase_play(int fd, int player_idx, const char* nick) {
     pthread_mutex_lock(&mutex);
     client_fds[player_idx] = -1; // esce dai destinatari del broadcast lobby
     send_local_map(fd, &pt.slots[player_idx]);
-    time_t start_time = maze.start_time;
     pthread_mutex_unlock(&mutex);
 
     time_t last_global = time(NULL);
-    time_t last_time_msg = 0; /* forza l'invio del primo TIME subito */
-    int exited = 0; /* il giocatore e' uscito dal labirinto mac sta aspettando l'esito */
 
     while (1) {
         pthread_mutex_lock(&mutex);
@@ -437,21 +422,9 @@ void phase_play(int fd, int player_idx, const char* nick) {
         if (check_and_handle_game_end(fd, nick)) return;
 
         time_t now = time(NULL);
-
-        /* invia il tempo rimanente al client una volta al secondo */
-        if (now != last_time_msg) {
-            int remaining_time = (int)GAME_TIMEOUT - (int)(now - start_time);
-            if (remaining_time < 0) remaining_time = 0;
-            char tmsg[32];
-            snprintf(tmsg, sizeof(tmsg), "TIME %d", remaining_time);
-            send_line(fd, tmsg);
-            last_time_msg = now;
-        }
-
         long elapsed = (long)(now - last_global);
         long remaining = (long)GLOBAL_MAP_INTERVAL - elapsed;
         if (remaining <= 0) remaining = 0;
-        if (remaining > 1) remaining = 1; /* sveglia ogni secondo per aggiornare il timer */
 
         struct timeval tv = { .tv_sec = remaining, .tv_usec = 0 };
         fd_set rfds;
@@ -468,13 +441,10 @@ void phase_play(int fd, int player_idx, const char* nick) {
         }
 
         if (ready == 0) {
-            long elapsed2 = (long)(time(NULL) - last_global);
-            if (elapsed2 >= GLOBAL_MAP_INTERVAL) {
-                pthread_mutex_lock(&mutex);
-                send_global_map(fd, &pt.slots[player_idx]);
-                pthread_mutex_unlock(&mutex);
-                last_global = time(NULL);
-            }
+            pthread_mutex_lock(&mutex);
+            send_global_map(fd, &pt.slots[player_idx]);
+            pthread_mutex_unlock(&mutex);
+            last_global = time(NULL);
             if (check_and_handle_game_end(fd, nick)) return;
             continue;
         }
@@ -487,8 +457,6 @@ void phase_play(int fd, int player_idx, const char* nick) {
                     if (check_and_handle_game_end(fd, nick)) return;
                 }
             }
-            /* n <= 0 (EAGAIN incluso): un altro thread ha gia' consumato
-               il byte di notifica, nulla da fare qui */
         }
 
         if (FD_ISSET(fd, &rfds)) {
@@ -592,11 +560,6 @@ int main(int argc, char* argv[]) {
     signal(SIGPIPE, SIG_IGN);
 
     if (pipe(notify_pipe) < 0) { perror("pipe"); return 1; }
-    /* il lato di lettura e' condiviso da tutti i thread dei giocatori: se
-       piu' thread vengono svegliati insieme da select() ma solo uno riesce
-       a leggere il byte, gli altri non devono bloccarsi su read() in attesa
-       di altri dati che potrebbero non arrivare mai */
-    fcntl(notify_pipe[0], F_SETFL, O_NONBLOCK);
 
     while (1) {
         struct sockaddr_in client_addr;
