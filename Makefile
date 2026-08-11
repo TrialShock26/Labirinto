@@ -18,18 +18,18 @@ SERVER_SRCS = $(SERVER_DIR)/server.c \
 CLIENT_SRCS = $(CLIENT_DIR)/client.c
 
 # Targets
-SERVER_BIN = $(SERVER_DIR)/server
-CLIENT_BIN = $(CLIENT_DIR)/client
+SERVER_OUT = $(SERVER_DIR)/server.out
+CLIENT_OUT = $(CLIENT_DIR)/client.out
 
 .PHONY: all clean
 
-all: $(SERVER_BIN) $(CLIENT_BIN)
+all: $(SERVER_OUT) $(CLIENT_OUT)
 
-$(SERVER_BIN): $(SERVER_SRCS) $(COMMON_DIR)/protocol.h
-	$(CC) $(CFLAGS) -o $@.out $(SERVER_SRCS) $(LDFLAGS)
+$(SERVER_OUT): $(SERVER_SRCS) $(COMMON_DIR)/protocol.h
+	$(CC) $(CFLAGS) -o $@ $(SERVER_SRCS) $(LDFLAGS)
 
-$(CLIENT_BIN): $(CLIENT_SRCS) $(COMMON_DIR)/protocol.h
-	$(CC) $(CFLAGS) -o $@.out $(CLIENT_SRCS) $(LDFLAGS)
+$(CLIENT_OUT): $(CLIENT_SRCS) $(COMMON_DIR)/protocol.h
+	$(CC) $(CFLAGS) -o $@ $(CLIENT_SRCS) $(LDFLAGS)
 
 clean:
-	rm -f $(SERVER_BIN) $(CLIENT_BIN)
+	rm -f $(SERVER_OUT) $(CLIENT_OUT)

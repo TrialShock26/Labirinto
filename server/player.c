@@ -31,7 +31,7 @@ void player_remove(PlayerTable *pt, int idx) {
     pt->count--;
 }
 
-int player_find_by_tid(const PlayerTable *pt, pthread_t tid) {
+int player_find_by_tid(const PlayerTable *pt, pthread_t tid) {//TODO useless
     for (int i = 0; i < MAX_PLAYERS; i++)
         if (pt->slots[i].active && pthread_equal(pt->slots[i].tid, tid))
             return i;
@@ -39,37 +39,31 @@ int player_find_by_tid(const PlayerTable *pt, pthread_t tid) {
 }
 
 void player_reveal(Player *p, int row, int col) {
-    for (int dr = -VIEW_RADIUS; dr <= VIEW_RADIUS; dr++) {
-        for (int dc = -VIEW_RADIUS; dc <= VIEW_RADIUS; dc++) {
-            int r = row + dr;
-            int c = col + dc;
+    for (int r_to_see = -VIEW_RADIUS; r_to_see <= VIEW_RADIUS; r_to_see++) {
+        for (int c_to_see = -VIEW_RADIUS; c_to_see <= VIEW_RADIUS; c_to_see++) {
+            int r = row + r_to_see;
+            int c = col + c_to_see;
             if (r >= 0 && r < MAZE_ROWS && c >= 0 && c < MAZE_COLS)
                 p->discovered[r][c] = 1;
         }
     }
 }
 
-/* Mappa locale: finestra (2*VIEW_RADIUS+1) x (2*VIEW_RADIUS+1)
-   centrata sul giocatore
-   Celle non scoperte = CELL_UNKNOWN.
-   Posizione giocatore = CELL_PLAYER. */
-void player_local_map(const Player *p, const char maze_grid[][MAZE_COLS],
-                      char *buf, int *out_rows, int *out_cols) {
-    int dim = 2 * VIEW_RADIUS + 1;
-    *out_rows = dim;
-    *out_cols = dim;
+/* Mappa locale: finestra (2*VIEW_RADIUS+1) x (2*VIEW_RADIUS+1) centrata sul giocatore
+   Celle non scoperte = CELL_UNKNOWN
+   Posizione giocatore = CELL_PLAYER */
+void player_local_map(const Player *p, const char maze_grid[][MAZE_COLS], char *buf) {
     int idx = 0;
-
-    for (int dr = -VIEW_RADIUS; dr <= VIEW_RADIUS; dr++) {
-        for (int dc = -VIEW_RADIUS; dc <= VIEW_RADIUS; dc++) {
-            int r = p->row + dr;
-            int c = p->col + dc;
+    for (int r_to_see = -VIEW_RADIUS; r_to_see <= VIEW_RADIUS; r_to_see++) {
+        for (int c_to_see = -VIEW_RADIUS; c_to_see <= VIEW_RADIUS; c_to_see++) {
+            int r = p->row + r_to_see;
+            int c = p->col + c_to_see;
             char ch;
             if (r < 0 || r >= MAZE_ROWS || c < 0 || c >= MAZE_COLS) {
                 ch = CELL_WALL;
-            } else if (dr == 0 && dc == 0) {
+            } else if (r_to_see == 0 && c_to_see == 0) {
                 ch = CELL_PLAYER;
-            } else if (!p->discovered[r][c]) {
+            } else if (!p->discovered[r][c]) {//TODO nel 3x3 non serve
                 ch = CELL_UNKNOWN;
             } else {
                 ch = maze_grid[r][c];
@@ -80,9 +74,10 @@ void player_local_map(const Player *p, const char maze_grid[][MAZE_COLS],
     buf[idx] = '\0';
 }
 
-// Mappa globale: intera matrice, celle non scoperte = CELL_UNKNOWN
-void player_global_map(const Player *p, const char maze_grid[][MAZE_COLS],
-                       char *buf) {
+/* Mappa globale: intera matrice
+   Celle non scoperte = CELL_UNKNOWN
+   Posizione giocatore = CELL_PLAYER */
+void player_global_map(const Player *p, const char maze_grid[][MAZE_COLS], char *buf) {
     int idx = 0;
     for (int r = 0; r < MAZE_ROWS; r++) {
         for (int c = 0; c < MAZE_COLS; c++) {
