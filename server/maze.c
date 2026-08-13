@@ -100,7 +100,6 @@ void maze_generate(Maze *maze) {
     maze->winner_score   = 0;
     maze->winner_nick[0] = '\0';
     maze->game_started   = 0;
-    maze->start_time     = time(NULL);
 }
 
 int maze_random_free_cell(const Maze *maze, int *row, int *col) {

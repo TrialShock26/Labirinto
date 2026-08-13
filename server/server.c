@@ -114,7 +114,11 @@ int auth_login(const char* nick, char* pass) {
         unsigned long p = 0;
         if (sscanf(line, "%s %lu", n, &p) == 2 && strcmp(n, nick) == 0 && p == hashed_pass) {
             for (int i = 0; i < MAX_PLAYERS; i++) {
-                if (strcmp(pt.slots[i].nick, nick) == 0 && pt.slots[i].active == 1) return -2;
+                if (strcmp(pt.slots[i].nick, nick) == 0 && pt.slots[i].active == 1) {
+                    fclose(f);
+                    pthread_mutex_unlock(&auth_mutex);
+                    return -2;
+                }
             }
             fclose(f);
             pthread_mutex_unlock(&auth_mutex);
@@ -233,8 +237,10 @@ int phase_lobby(int fd, int* player_ready) {
             pt.ready_count++;
             *player_ready = 1;
             broadcast_lobby_update();
-            if (pt.ready_count >= pt.count && pt.count >= 2)
+            if (pt.ready_count >= pt.count && pt.count >= 2) {
                 maze.game_started = 1;
+                maze.start_time = time(NULL);
+            }
             pthread_mutex_unlock(&mutex);
             return 1;
         }

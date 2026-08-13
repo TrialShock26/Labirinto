@@ -57,7 +57,7 @@ int sock     = -1;
 int score    = 0;
 int exited   = 0;
 int in_lobby = 1;
-int ready    = 0;
+int g_ready  = 0;
 char nick[MAX_NICK_LEN] = {0};
 
 int time_remaining = GAME_TIMEOUT;
@@ -73,31 +73,32 @@ int  local_rows = 0, local_cols = 0;
 char global_data[MAZE_ROWS*MAZE_COLS+4] = {0};
 int  global_rows = 0, global_cols = 0;
 
-struct termios oritermios;
+struct termios orig_termios;
 
-void send_line(const char *msg) {
+void send_line(const char* msg) {
     char buf[MAX_MSG_LEN + 2];
-    int  n = snprintf(buf, sizeof(buf), "%s\n", msg);
-    int  sent_total = 0;
+    int ret = snprintf(buf, sizeof(buf), "%s\n", msg);
+    if (ret < 0) { perror("parsing"); return; }
 
-
-    while (sent_total < n) {
-        int sent = send(sock, buf + sent_total, n - sent_total, 0);
-        if (sent <= 0) {
-            if (sent < 0 && errno == EINTR) continue;
-            perror("send");
+    size_t sent = 0, n = ret;
+    while (sent < n) {
+        ssize_t w = send(sock, buf+sent, (size_t)n-sent, 0);
+        if (w < 0) {
+            if (errno == EINTR) continue;
+            if (errno == EPIPE) perror("server disconnesso");
+            else perror("send");
             return;
         }
-        sent_total += sent;
+        sent = sent + (size_t)w;
     }
 }
 
-int read_line(int fd, char *buf, int maxlen) {
-    int  i = 0; char c;
-    while (i < maxlen - 1) {
-        int n = recv(fd, &c, 1, 0);
-        if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) return -1;
+int recv_line(int fd, char* buf) {
+    int i = 0;
+    char c;
+    while (i < MAX_MSG_LEN - 1) {
+        ssize_t n = recv(fd, &c, 1, 0);
+        if (n <= 0) { if (errno == EINTR) continue; if (n != 0) perror("recv"); return -1; }
         if (c == '\n') break;
         if (c != '\r') buf[i++] = c;
     }
@@ -108,8 +109,8 @@ int read_line(int fd, char *buf, int maxlen) {
 
 void enable_raw_mode(void) {
     if (!isatty(STDIN_FILENO)) return;
-    tcgetattr(STDIN_FILENO, &oritermios);
-    struct termios raw = oritermios;
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    struct termios raw = orig_termios;
     raw.c_lflag &= ~(ICANON | ECHO);
     raw.c_iflag &= ~(ICRNL);
     raw.c_cc[VMIN]  = 1;
@@ -119,7 +120,7 @@ void enable_raw_mode(void) {
 
 void disable_raw_mode(void) {
     if (!isatty(STDIN_FILENO)) return;
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &oritermios);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
 
@@ -154,7 +155,7 @@ void display_lobby(int ready, int total) {
         printf(ANSI_YELLOW ANSI_BOLD
                "  Tutti pronti! La partita sta per iniziare...\n"
                ANSI_RESET);
-    } else if (!ready) {
+    } else if (!g_ready) {
         printf(ANSI_GRAY
                "  In attesa dei giocatori...\n"
                "  Premi " ANSI_RESET ANSI_BOLD "[r]" ANSI_RESET ANSI_GRAY
@@ -334,7 +335,7 @@ void show_msg(const char *fmt, ...) {
 
 /* come show_msg, ma il messaggio resta visibile anche dopo i successivi
    redraw della mappa (es. arrivo di una nuova mappa GLOBAL) */
-void show_mspersist(const char *fmt, ...) {
+void show_msg_persist(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(persist_msg, sizeof(persist_msg), fmt, ap);
@@ -380,7 +381,7 @@ int handle_server_msg(const char *line) {
         fflush(stdout);
         /* legge subito LOCAL che il server manda immediatamente dopo START */
         char next[MAX_MSG_LEN];
-        if (read_line(sock, next, sizeof(next)) > 0)
+        if (recv_line(sock, next) > 0)
             handle_server_msg(next);
         return 1;
     }
@@ -441,7 +442,7 @@ int handle_server_msg(const char *line) {
     
     if (strcmp(cmd, "EXIT_OK") == 0) {
         sscanf(line, "EXIT_OK %d", &score);
-        show_mspersist(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, score);
+        show_msg_persist(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, score);
         exited = 1;
         return 1;
     }
@@ -539,7 +540,7 @@ int authenticate(void) {
         snprintf(msg, sizeof(msg), "LOGIN %s %s", nick, pass);
 
     send_line(msg);
-    if (read_line(sock, buf, sizeof(buf)) < 0) return 0;
+    if (recv_line(sock, buf) < 0) return 0;
     if (strncmp(buf, "OK", 2) != 0) {
         printf(ANSI_RED "  Errore: %s\n" ANSI_RESET, buf); return 0;
     }
@@ -547,7 +548,7 @@ int authenticate(void) {
     if (choice[0] == '1') {
         snprintf(msg, sizeof(msg), "LOGIN %s %s", nick, pass);
         send_line(msg);
-        if (read_line(sock, buf, sizeof(buf)) < 0) return 0;
+        if (recv_line(sock, buf) < 0) return 0;
         if (strncmp(buf, "OK", 2) != 0) {
             printf(ANSI_RED "  Login fallito: %s\n" ANSI_RESET, buf); return 0;
         }
@@ -555,8 +556,7 @@ int authenticate(void) {
 
     printf(ANSI_GREEN ANSI_BOLD "\n  Benvenuto, %s!\n" ANSI_RESET, nick);
     fflush(stdout);
-    strncpy(nick, nick, sizeof(nick) - 1);
-    nick[sizeof(nick) - 1] = '\0';
+    sleep(1);
     return 1;
 }
 
@@ -580,7 +580,7 @@ void game_loop(void) {
         }
 
         if (FD_ISSET(sock, &fds)) {
-            if (read_line(sock, line, sizeof(line)) < 0) {
+            if (recv_line(sock, line) < 0) {
                 printf(ANSI_RED "\n  Connessione chiusa dal server.\n" ANSI_RESET);
                 break;
             }
@@ -610,9 +610,9 @@ void game_loop(void) {
             if (in_lobby) {
                 switch (ch) {
                     case 'r':
-                        if (!ready) {
+                        if (!g_ready) {
                             send_line("READY");
-                            ready = 1;
+                            g_ready = 1;
                             show_msg(ANSI_GREEN "  Sei pronto! In attesa degli altri..." ANSI_RESET);
                         } else {
                             show_msg(ANSI_GRAY "  Hai già dichiarato di essere pronto." ANSI_RESET);
@@ -699,7 +699,7 @@ int main(int argc, char *argv[]) {
     fflush(stdout);
 
     if (game_end_msg[0] != '\0') {
-        printf("%s", game_end_msg);
+        printf("%s\n", game_end_msg);
         fflush(stdout);
     }
 
