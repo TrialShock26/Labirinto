@@ -5,8 +5,7 @@
 #include "../common/protocol.h"
 
 GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
-                          char *winner_nick, int *winner_score, int *draw)
-{
+                          char *winner_nick, int *winner_score, int *draw) {
     *winner_nick  = '\0';
     *winner_score = 0;
     *draw         = 0;
@@ -96,10 +95,7 @@ GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
     return GAME_RUNNING;
 }
 
-void game_build_end_msg(GameStatus status,
-                        const char *winner_nick, int winner_score, int draw,
-                        char *buf)
-{
+void game_build_end_msg(GameStatus status, const char *winner_nick, int winner_score, int draw, char *buf) {
     if (status == GAME_OVER_TIMEOUT && winner_score < 0) {
         snprintf(buf, MAX_MSG_LEN, "GAME_END TIMEOUT");
         return;

@@ -298,16 +298,16 @@ void redraw_maps(void) {
     }
 
     printf(ANSI_GRAY
-           "  legenda: " SYM_WALL "=muro  "
-           SYM_OBJECT "=oggetto  "
-           ANSI_RESET ANSI_BG_GREEN "  " ANSI_RESET ANSI_GRAY "=uscita  "
-           SYM_PLAYER "=tu  "
-           SYM_UNKNOWN "=inesplorato"
+           "  legenda: " SYM_WALL ": muro  "
+           SYM_OBJECT ": oggetto  "
+           ANSI_RESET ANSI_BG_GREEN "  " ANSI_RESET ANSI_GRAY ": uscita  "
+           SYM_PLAYER ": tu  "
+           SYM_UNKNOWN ": inesplorato"
            ANSI_RESET "\n\n");
 
-    printf(ANSI_BOLD "[w/s/a/d]" ANSI_RESET "=muovi  "
-           ANSI_BOLD "[l]" ANSI_RESET "=lista  "
-           ANSI_BOLD "[q]" ANSI_RESET "=esci\n");
+    printf(ANSI_BOLD "  [w/a/s/d]" ANSI_RESET " per muoverti  "
+           ANSI_BOLD "[l]" ANSI_RESET "ista  "
+           ANSI_BOLD "[q]" ANSI_RESET "uit\n");
 
     if (persist_msg[0] != '\0') {
         printf("\033[32;1H");
@@ -632,13 +632,13 @@ void game_loop(void) {
                 }
                 switch (ch) {
                     case 'w': send_line("MOVE N"); break;
-                    case 's': send_line("MOVE S"); break;
                     case 'a': send_line("MOVE W"); break;
+                    case 's': send_line("MOVE S"); break;
                     case 'd': send_line("MOVE E"); break;
                     case 'l': send_line("LIST");   break;
                     case 'q': send_line("QUIT"); running = 0; break;
                     default:
-                        show_msg(ANSI_GRAY "  Comando non riconosciuto. Usa w/s/a/d, l=lista, q=esci" ANSI_RESET);
+                        show_msg(ANSI_GRAY "  Comando non riconosciuto. Usa w/a/s/d, l=lista, q=esci" ANSI_RESET);
                         break;
                 }
             }

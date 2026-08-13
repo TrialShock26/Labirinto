@@ -23,6 +23,8 @@ Maze maze;
 PlayerTable pt;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t auth_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t all_end = PTHREAD_COND_INITIALIZER;
+int set = 1, all_done;
 int notify_pipe[2] = {-1, -1};
 volatile int game_over = 0; //TODO se funziona togliendo volatile - magic numbers
 int client_fds[MAX_PLAYERS];
@@ -394,15 +396,20 @@ int check_and_handle_game_end(int fd, const char* nick) {
 
     pthread_mutex_lock(&mutex);
     GameStatus status = game_check_end(&maze, &pt, winner, &winner_score, &is_draw);
-    if (status != GAME_RUNNING) game_over = 1;
+    if (status != GAME_RUNNING) {
+        game_over = 1;
+        char end_msg[MAX_MSG_LEN];
+        game_build_end_msg(status, winner, winner_score, is_draw, end_msg);
+        send_line(fd, end_msg);
+        log_write("GAME_END nick=%s msg=%s", nick, end_msg);
+
+        all_done++;
+        pthread_cond_broadcast(&all_end);
+        while (all_done < pt.count) pthread_cond_wait(&all_end, &mutex);
+    }
     pthread_mutex_unlock(&mutex);
 
     if (status == GAME_RUNNING) return 0;
-
-    char end_msg[MAX_MSG_LEN];
-    game_build_end_msg(status, winner, winner_score, is_draw, end_msg);
-    send_line(fd, end_msg);
-    log_write("GAME_END nick=%s msg=%s", nick, end_msg);
     return 1;
 }
 
@@ -459,19 +466,16 @@ void phase_play(int fd, int player_idx, const char* nick) {
             char buf[2];
             int n = read(notify_pipe[0], buf, 2);
             for (int i = 0; i < n; i++) {
-                if (buf[i] == 0x01) {
+                if (buf[i] == 0x01)
                     if (check_and_handle_game_end(fd, nick)) return;
-                }
             }
         }
 
         if (FD_ISSET(fd, &rfds)) {
             int result = handle_play_command(fd, player_idx, nick);
             if (result == 0) return; // Disconnesso o quit
-            if (result == 2) { // Uscito
-                check_and_handle_game_end(fd, nick);
-                return;
-            }
+            if (result == 2) // Uscito
+                if (check_and_handle_game_end(fd, nick)) return;
         }
     }
 }
@@ -593,5 +597,6 @@ int main(int argc, char* argv[]) {
     }
 
     close(listen_sd);
+    log_close(); //TODO ??
     return 0;
 }
