@@ -350,6 +350,22 @@ void show_msg_persist(const char *fmt, ...) {
     fflush(stdout);
 }
 
+/* stampa/aggiorna solo la zona timer (riga 5, subito dopo "  LOCAL MAP"),
+   senza toccare il resto dello schermo. Usata sia dal tick locale in
+   game_loop() sia dall'eventuale messaggio TIME ricevuto dal server. */
+void print_timer(void) {
+    int min = time_remaining / 60;
+    int sec = time_remaining % 60;
+    printf("\033[5;12H");
+    if (time_remaining <= 30)
+        printf(ANSI_RED ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
+    else if (time_remaining <= 60)
+        printf(ANSI_YELLOW ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
+    else
+        printf(ANSI_GREEN ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
+    fflush(stdout);
+}
+
 
 int handle_server_msg(const char *line) {
     char cmd[16];
@@ -412,21 +428,15 @@ int handle_server_msg(const char *line) {
         return 1;
     }
 
-    /* timer — aggiorna solo la zona timer nella riga 5 */
+    /* timer — aggiorna solo la zona timer nella riga 5.
+       Il client fa comunque scorrere il timer localmente (vedi print_timer()
+       richiamata dal tick in game_loop()); se il server invia comunque un
+       TIME lo usiamo per riallineare il valore mostrato. */
     if (strcmp(cmd, "TIME") == 0) {
         int t = 0;
         sscanf(line, "TIME %d", &t);
         time_remaining = t;
-        int min = time_remaining / 60;
-        int sec = time_remaining % 60;
-        printf("\033[5;12H");   /* riga 5, col 12 (subito dopo "  LOCAL MAP") */
-        if (time_remaining <= 30)
-            printf(ANSI_RED ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
-        else if (time_remaining <= 60)
-            printf(ANSI_YELLOW ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
-        else
-            printf(ANSI_GREEN ANSI_BOLD " ⏱ %2d:%02d" ANSI_RESET, min, sec);
-        fflush(stdout);
+        print_timer();
         return 1;
     }
 
@@ -573,10 +583,19 @@ void game_loop(void) {
         FD_SET(sock, &fds);
         int maxfd = sock + 1;
 
-        int ready = select(maxfd, &fds, NULL, NULL, NULL);
+        struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
+        int ready = select(maxfd, &fds, NULL, NULL, &tv);
         if (ready < 0) {
             if (errno == EINTR) continue;
             perror("select"); break;
+        }
+
+        if (ready == 0) {
+            if (!in_lobby && time_remaining > 0) {
+                time_remaining--;
+                print_timer();
+            }
+            continue;
         }
 
         if (FD_ISSET(sock, &fds)) {

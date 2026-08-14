@@ -24,7 +24,7 @@ PlayerTable pt;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t auth_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t all_end = PTHREAD_COND_INITIALIZER;
-int set = 1, all_done;
+int all_done = 0;
 int notify_pipe[2] = {-1, -1};
 volatile int game_over = 0; //TODO se funziona togliendo volatile - magic numbers
 int client_fds[MAX_PLAYERS];
@@ -491,6 +491,7 @@ void client_cleanup(int fd, int player_idx, int player_ready, const char* nick) 
             pt.ready_count = 0;
             maze.game_started = 0;
             game_over = 0;
+            all_done = 0;
             maze_generate(&maze);
             log_write("maze regenerated (%dx%d)", MAZE_ROWS, MAZE_COLS);
         }
