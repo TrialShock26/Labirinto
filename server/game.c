@@ -1,14 +1,26 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+
 #include "game.h"
 #include "../common/protocol.h"
 
 GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
                           char *winner_nick, int *winner_score, int *draw) {
-    *winner_nick  = '\0';
+    *winner_nick = '\0';
     *winner_score = 0;
-    *draw         = 0;
+    *draw = 0;
+
+    if (pt->count == 1) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            if (pt->slots[i].active) {
+                strncpy(winner_nick, pt->slots[i].nick, MAX_NICK_LEN - 1);
+                *winner_score = pt->slots[i].score;
+                *draw = 0;
+                return GAME_OVER_EXIT;
+            }
+        }
+    }
 
     int timed_out = (time(NULL) - maze->start_time) >= GAME_TIMEOUT;
 

@@ -2,10 +2,14 @@
 #define MAZE_H
 
 #include <time.h>
+
 #include "../common/protocol.h"
 
+#define NUM_OBJECTS 10
+#define NUM_EXITS   2
+
 typedef struct {
-    char cell;  // CELL_FREE / CELL_WALL / CELL_EXIT / CELL_OBJECT
+    char cell;  // CELL_FREE - CELL_WALL - CELL_EXIT - CELL_OBJECT
 } MazeCell;
  
 typedef struct {
@@ -28,8 +32,5 @@ int maze_random_free_cell(const Maze *maze, int *row, int *col);
 
 // Rimuove un oggetto dalla cella (r,c)
 int maze_collect_object(Maze *maze, int row, int col);
-
-/* Stampa il labirinto su stderr (debug). TODO togliere*/
-void maze_dump(const Maze *maze);
 
 #endif

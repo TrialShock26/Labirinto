@@ -2,10 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include "maze.h"
 
-#define NUM_OBJECTS  10
-#define NUM_EXITS     2
+#include "maze.h"
 
 int DR2[] = {-2,  2,  0,  0};
 int DC2[] = { 0,  0, -2,  2};
@@ -121,12 +119,4 @@ int maze_collect_object(Maze *maze, int row, int col) {
         return 1;
     }
     return 0;
-}
-
-void maze_dump(const Maze *maze) {
-    for (int r = 0; r < MAZE_ROWS; r++) {
-        for (int c = 0; c < MAZE_COLS; c++)
-            fputc(maze->grid[r][c].cell, stderr);
-        fputc('\n', stderr);
-    }
 }

@@ -26,7 +26,7 @@ pthread_mutex_t auth_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t all_end = PTHREAD_COND_INITIALIZER;
 int all_done = 0;
 int notify_pipe[2] = {-1, -1};
-volatile int game_over = 0; //TODO se funziona togliendo volatile - magic numbers
+volatile int game_over = 0; //TODO se funziona togliendo volatile
 int client_fds[MAX_PLAYERS];
 int listen_sd = -1;
 
@@ -75,7 +75,7 @@ int recv_line(int fd, char* buf) {
 }
 
 void broadcast_lobby_update() {
-    char line[64];
+    char line[MAX_MSG_LEN];
     snprintf(line, sizeof(line), "WAITING %d/%d", pt.ready_count, pt.count);
     for (int i = 0; i < MAX_PLAYERS; i++)
         if (client_fds[i] >= 0) send_line(client_fds[i], line);
@@ -164,8 +164,8 @@ int phase_auth(int fd, struct sockaddr_in addr, char* nick, size_t nick_size) {
     while (1) {
         if (recv_line(fd, line) < 0) return 0;
 
-        char cmd[16], arg1[MAX_NICK_LEN], arg2[MAX_PASS_LEN];
-        int n = sscanf(line, "%15s %31s %63s", cmd, arg1, arg2);
+        char cmd[MAX_MSG_LEN], arg1[MAX_NICK_LEN], arg2[MAX_PASS_LEN];
+        int n = sscanf(line, "%s %s %s", cmd, arg1, arg2);
 
         if (strcmp(cmd, "REGISTER") == 0 && n == 3) {
             if (auth_register(arg1, arg2) == 0) {
@@ -222,7 +222,7 @@ int phase_join(int fd, const char* nick) {
 
 int phase_lobby(int fd, int* player_ready) {
     pthread_mutex_lock(&mutex);
-    char init_msg[64];
+    char init_msg[MAX_MSG_LEN];
     snprintf(init_msg, sizeof(init_msg), "WAITING %d/%d", pt.ready_count, pt.count);
     pthread_mutex_unlock(&mutex);
     send_line(fd, init_msg);
@@ -231,8 +231,8 @@ int phase_lobby(int fd, int* player_ready) {
     while (1) {
         if (recv_line(fd, line) < 0) return 0;
 
-        char cmd[16];
-        sscanf(line, "%15s", cmd);
+        char cmd[MAX_MSG_LEN];
+        sscanf(line, "%s", cmd);
 
         if (strcmp(cmd, "READY") == 0) {
             pthread_mutex_lock(&mutex);
@@ -279,8 +279,8 @@ int phase_wait_start(int fd) {
 
         if (r > 0 && FD_ISSET(fd, &rfds)) {
             if (recv_line(fd, line) < 0) return 0;
-            char cmd[16];
-            sscanf(line, "%15s", cmd);
+            char cmd[MAX_MSG_LEN];
+            sscanf(line, "%s", cmd);
             if (strcmp(cmd, "QUIT") == 0) {
                 send_line(fd, "OK");
                 return 0;
@@ -324,7 +324,7 @@ int handle_move_command(int fd, const char* line, int player_idx, const char* ni
 
     if (maze_collect_object(&maze, new_r, new_c)) {
         p->score++;
-        char msg[64];
+        char msg[MAX_MSG_LEN];
         snprintf(msg, sizeof(msg), "COLLECT %d", p->score);
         send_line(fd, msg);
         log_write("COLLECT nick=%s score=%d pos=(%d,%d)", nick, p->score, new_r, new_c);
@@ -332,7 +332,7 @@ int handle_move_command(int fd, const char* line, int player_idx, const char* ni
 
     if (maze.grid[new_r][new_c].cell == CELL_EXIT) {
         p->exited = 1;
-        char msg[64];
+        char msg[MAX_MSG_LEN];
         snprintf(msg, sizeof(msg), "EXIT_OK %d", p->score);
         send_line(fd, msg);
         log_write("EXIT nick=%s score=%d", nick, p->score);
@@ -347,7 +347,7 @@ int handle_move_command(int fd, const char* line, int player_idx, const char* ni
 
 void handle_list_command(int fd) {
     pthread_mutex_lock(&mutex);
-    char names[MAX_MSG_LEN] = "";
+    char names[MAX_MSG_LEN - 8] = "";
     int count = 0;
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (pt.slots[i].active) {
@@ -356,7 +356,7 @@ void handle_list_command(int fd) {
             count++;
         }
     }
-    char msg[MAX_MSG_LEN + 16];
+    char msg[MAX_MSG_LEN];
     snprintf(msg, sizeof(msg), "LIST %d%s", count, names);
     pthread_mutex_unlock(&mutex);
 
@@ -598,6 +598,6 @@ int main(int argc, char* argv[]) {
     }
 
     close(listen_sd);
-    log_close(); //TODO ??
+    log_close();
     return 0;
 }

@@ -2,6 +2,7 @@
 #define PLAYER_H
 
 #include <pthread.h>
+
 #include "../common/protocol.h"
 
 typedef struct {
@@ -25,9 +26,6 @@ int player_add(PlayerTable *pt, pthread_t tid, const char *nick, int row, int co
 
 // Libera lo slot dell'indice dato
 void player_remove(PlayerTable *pt, int idx);
-
-// Trova l'indice del giocatore con quel TID (-1 se non trovato)
-int  player_find_by_tid(const PlayerTable *pt, pthread_t tid);
 
 // Rivela le celle attorno a (row,col) nel raggio VIEW_RADIUS
 void player_reveal(Player *p, int row, int col);

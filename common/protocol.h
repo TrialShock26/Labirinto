@@ -16,7 +16,7 @@
 
 // Parametri di gioco
 #define GLOBAL_MAP_INTERVAL 10  // Secondi tra un invio della mappa globale e il prossimo
-#define GAME_TIMEOUT        90  // Durata massima partita
+#define GAME_TIMEOUT        30  // Durata massima partita
 #define MAX_PLAYERS         10
 #define MAX_NICK_LEN        32
 #define MAX_PASS_LEN        32
@@ -24,14 +24,5 @@
 #define MAX_MSG_LEN         1024
 #define USERS_FILE          "users.txt"
 #define LOG_FILE            "server.log"
-
-// Messaggi stato del player TODO no use
-#define CMD_READY           "READY"
-#define MSG_WAITING         "WAITING"
-#define MSG_START           "START"
-
-// Codici di ritorno usati internamente
-#define PROTO_OK            0
-#define PROTO_ERR          -1
 
 #endif

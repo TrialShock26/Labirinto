@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <pthread.h>
+
 #include "player.h"
 #include "maze.h"
 
@@ -29,13 +30,6 @@ void player_remove(PlayerTable *pt, int idx) {
     if (idx < 0 || idx >= MAX_PLAYERS) return;
     pt->slots[idx].active = 0;
     pt->count--;
-}
-
-int player_find_by_tid(const PlayerTable *pt, pthread_t tid) {//TODO useless
-    for (int i = 0; i < MAX_PLAYERS; i++)
-        if (pt->slots[i].active && pthread_equal(pt->slots[i].tid, tid))
-            return i;
-    return -1;
 }
 
 void player_reveal(Player *p, int row, int col) {

@@ -2,9 +2,7 @@
 *.out
 
 # Log files
-
 *.log
 
 # User data
-
 *.txt

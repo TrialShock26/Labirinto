@@ -11,10 +11,10 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <signal.h>
-#include <stdarg.h> //per stampare i messaggi a partire da una riga fissa
+#include <stdarg.h>
+#include <pthread.h>
 
 #include "../common/protocol.h"
-
 
 #define ANSI_RESET      "\033[0m"
 #define ANSI_BOLD       "\033[1m"
@@ -35,17 +35,11 @@
 #define ANSI_CLEAR      "\033[2J\033[H"
 #define ANSI_CLEAR_LINE "\033[2K\r"
 
-
-/* posizione fissa dove inizia la mappa nel buffer alternativo */
-#define MAP_START_ROW  5   /* riga dove inizia il disegno della mappa */
-
-/*
-    alternate screen buffer
-*/
+// Alternate screen buffer
 #define ANSI_ALT_SCREEN_ON  "\033[?1049h"
 #define ANSI_ALT_SCREEN_OFF "\033[?1049l"
-#define ANSI_CURSOR_HIDE    "\033[?25l"  
-#define ANSI_CURSOR_SHOW    "\033[?25h"  
+#define ANSI_CURSOR_HIDE    "\033[?25l"
+#define ANSI_CURSOR_SHOW    "\033[?25h"
 
 #define SYM_PLAYER   "\xe1\x8c\xb8"
 #define SYM_WALL     "\xf0\x91\x80\xa9"
@@ -53,24 +47,25 @@
 #define SYM_EXIT     "E"
 #define SYM_UNKNOWN  "?"
 
+#define MAP_START_ROW  5
+
 int sock     = -1;
 int score    = 0;
 int exited   = 0;
 int in_lobby = 1;
 int g_ready  = 0;
 char nick[MAX_NICK_LEN] = {0};
+pthread_t tid_timer;
+int timer_exists = 0;
 
 int time_remaining = GAME_TIMEOUT;
-char persist_msg[256] = {0}; /* messaggio che deve restare visibile anche dopo i redraw della mappa */
-char game_end_msg[900] = {0}; /* schermata finale, stampata dopo l'uscita dallo schermo alternativo */
+char persist_msg[MAX_MSG_LEN] = {0};
+char game_end_msg[MAX_MSG_LEN*2] = {0};
 
-/*
-    per memorizzare la mappa locale per il posizionamento a sinistra
-*/
-
-char local_data[MAX_MSG_LEN]         = {0};
+// Per memorizzare la mappa locale per il posizionamento a sinistra
+char local_data[MAX_MSG_LEN] = {0};
 int  local_rows = 0, local_cols = 0;
-char global_data[MAZE_ROWS*MAZE_COLS+4] = {0};
+char global_data[MAZE_ROWS*MAZE_COLS + 4] = {0};
 int  global_rows = 0, global_cols = 0;
 
 struct termios orig_termios;
@@ -106,6 +101,15 @@ int recv_line(int fd, char* buf) {
     return i;
 }
 
+void* timer(void* arg) {
+    (void)arg;
+    while (1) {
+        sleep(1);
+        time_remaining--;
+    }
+    return NULL;
+}
+
 
 void enable_raw_mode(void) {
     if (!isatty(STDIN_FILENO)) return;
@@ -123,19 +127,15 @@ void disable_raw_mode(void) {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
-
-/*
-    visualizzazione lobby pre-partita
-*/
-
+// Visualizzazione lobby pre-partita
 void display_lobby(int ready, int total) {
     printf("\033[1;1H");   /* cursore in cima */
     printf("\033[J");       /* cancella tutto sotto */
 
     printf(ANSI_BOLD ANSI_CYAN
            "  ╔══════════════════════════════════╗\n"
-           "  ║        LABYRINTH  GAME           ║\n"
-           "  ║          — LOBBY —               ║\n"
+           "  ║          LABYRINTH GAME          ║\n"
+           "  ║             — LOBBY —            ║\n"
            "  ╚══════════════════════════════════╝\n"
            ANSI_RESET "\n");
 
@@ -164,23 +164,12 @@ void display_lobby(int ready, int total) {
         printf(ANSI_GRAY "  In attesa degli altri giocatori...\n" ANSI_RESET);
     }
 
-    printf("\n  " ANSI_BOLD "[r]" ANSI_RESET "=pronto   "
-               ANSI_BOLD "[q]" ANSI_RESET "=esci\n");
+    printf("\n  " ANSI_BOLD "[r]" ANSI_RESET "eady   "
+               ANSI_BOLD "[q]" ANSI_RESET "uit\n");
     fflush(stdout);
 }
 
-/*
-    visualizzazione mappa locale
-*/
-
-/*
-void display_map(const char *type, int rows, int cols, const char *data) {
-    ...
-}
-*/
-
-
-/* ridisegna entrambe le mappe affiancate, sempre alla stessa posizione */
+// Ridisegna entrambe le mappe affiancate, sempre alla stessa posizione
 void redraw_maps(void) {
     if (local_rows == 0 && global_rows == 0) return;
 
@@ -267,7 +256,7 @@ void redraw_maps(void) {
                 switch (ch) {
                     case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
                     case CELL_FREE:    printf("  ");                                                            break;
-                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                break;
+                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                 break;
                     case CELL_EXIT:    printf(ANSI_BG_GREEN "  " ANSI_RESET);                                   break;
                     case CELL_UNKNOWN: printf(" " SYM_UNKNOWN);                                                 break;
                     case CELL_PLAYER:  printf(" " SYM_PLAYER);                                                  break;
@@ -305,8 +294,8 @@ void redraw_maps(void) {
            SYM_UNKNOWN ": inesplorato"
            ANSI_RESET "\n\n");
 
-    printf(ANSI_BOLD "  [w/a/s/d]" ANSI_RESET " per muoverti  "
-           ANSI_BOLD "[l]" ANSI_RESET "ista  "
+    printf(ANSI_BOLD "  [w/a/s/d]" ANSI_RESET " per muoverti - "
+           ANSI_BOLD "[l]" ANSI_RESET "ista - "
            ANSI_BOLD "[q]" ANSI_RESET "uit\n");
 
     if (persist_msg[0] != '\0') {
@@ -351,8 +340,7 @@ void show_msg_persist(const char *fmt, ...) {
 }
 
 /* stampa/aggiorna solo la zona timer (riga 5, subito dopo "  LOCAL MAP"),
-   senza toccare il resto dello schermo. Usata sia dal tick locale in
-   game_loop() sia dall'eventuale messaggio TIME ricevuto dal server. */
+   senza toccare il resto dello schermo. */
 void print_timer(void) {
     int min = time_remaining / 60;
     int sec = time_remaining % 60;
@@ -368,8 +356,8 @@ void print_timer(void) {
 
 
 int handle_server_msg(const char *line) {
-    char cmd[16];
-    sscanf(line, "%15s", cmd);
+    char cmd[MAX_MSG_LEN];
+    sscanf(line, "%s", cmd);
 
 
     /* lobby */
@@ -381,19 +369,15 @@ int handle_server_msg(const char *line) {
     }
 
     if (strcmp(cmd, "START") == 0) {
+        pthread_create(&tid_timer, NULL, timer, NULL);
+        timer_exists = 1;
         in_lobby = 0;
         printf(ANSI_CLEAR);
         printf(ANSI_GREEN ANSI_BOLD
-               "\n  ╔══════════════════════════════════╗\n"
-               "  ║      PARTITA INIZIATA!           ║\n"
-               "  ╚══════════════════════════════════╝\n"
+             "\n  ╔═════════════════════════════════╗\n"
+               "  ║        PARTITA INIZIATA!        ║\n"
+               "  ╚═════════════════════════════════╝\n"
                ANSI_RESET "\n");
-        printf("  " ANSI_BOLD "w" ANSI_RESET "=Nord  "
-                   ANSI_BOLD "s" ANSI_RESET "=Sud  "
-                   ANSI_BOLD "a" ANSI_RESET "=Ovest  "
-                   ANSI_BOLD "d" ANSI_RESET "=Est  "
-                   ANSI_BOLD "l" ANSI_RESET "=Lista  "
-                   ANSI_BOLD "q" ANSI_RESET "=Esci\n\n");
         fflush(stdout);
         /* legge subito LOCAL che il server manda immediatamente dopo START */
         char next[MAX_MSG_LEN];
@@ -413,30 +397,16 @@ int handle_server_msg(const char *line) {
 
     /* mappa locale */
     if (strcmp(cmd, "LOCAL") == 0) {
-    if (sscanf(line, "LOCAL %d %d %s",
-               &local_rows, &local_cols, local_data) == 3)
-        redraw_maps();
-    return 1;
+        if (sscanf(line, "LOCAL %d %d %s", &local_rows, &local_cols, local_data) == 3)
+            redraw_maps();
+        return 1;
     }
 
     /*mappa globale */
 
     if (strcmp(cmd, "GLOBAL") == 0) {
-        if (sscanf(line, "GLOBAL %d %d %s",
-                &global_rows, &global_cols, global_data) == 3)
+        if (sscanf(line, "GLOBAL %d %d %s", &global_rows, &global_cols, global_data) == 3)
             redraw_maps();
-        return 1;
-    }
-
-    /* timer — aggiorna solo la zona timer nella riga 5.
-       Il client fa comunque scorrere il timer localmente (vedi print_timer()
-       richiamata dal tick in game_loop()); se il server invia comunque un
-       TIME lo usiamo per riallineare il valore mostrato. */
-    if (strcmp(cmd, "TIME") == 0) {
-        int t = 0;
-        sscanf(line, "TIME %d", &t);
-        time_remaining = t;
-        print_timer();
         return 1;
     }
 
@@ -460,7 +430,7 @@ int handle_server_msg(const char *line) {
     /* fine partita */
     if (strcmp(cmd, "GAME_END") == 0) {
         const char *payload = line + 9;
-        char body[400] = {0};
+        char body[MAX_MSG_LEN] = {0};
         if (strncmp(payload, "WIN", 3) == 0) {
             char winner[MAX_NICK_LEN]; int score;
             if (sscanf(payload, "WIN %s %d", winner, &score) == 2)
@@ -472,9 +442,6 @@ int handle_server_msg(const char *line) {
             snprintf(body, sizeof(body),
                      ANSI_CYAN ANSI_BOLD "  🤝 Pareggio! Punteggio massimo: %d\n"
                      ANSI_RESET, score);
-        } else if (strncmp(payload, "TIMEOUT", 7) == 0) {
-            snprintf(body, sizeof(body),
-                     ANSI_RED ANSI_BOLD "  ⏰ Timeout! Nessun vincitore.\n" ANSI_RESET);
         } else {
             snprintf(body, sizeof(body), "  %s\n", payload);
         }
@@ -484,10 +451,10 @@ int handle_server_msg(const char *line) {
            stampera' DOPO l'uscita dallo schermo alternativo, cosi' resta
            visibile in modo permanente. */
         snprintf(game_end_msg, sizeof(game_end_msg),
-                 ANSI_BOLD "\n╔══════════════════════════════╗\n"
-                 "║       FINE PARTITA           ║\n"
-                 "╚══════════════════════════════╝\n" ANSI_RESET
-                 "%s\n", body);
+                 ANSI_BOLD "\n  ╔════════════════════════════╗\n"
+                             "  ║        FINE PARTITA        ║\n"
+                             "  ╚════════════════════════════╝\n\n" ANSI_RESET
+                             "%s", body);
         return 0;
     }
 
@@ -516,11 +483,11 @@ int handle_server_msg(const char *line) {
 
 
 int authenticate(void) {
-    char choice[8], nick[MAX_NICK_LEN], pass[MAX_PASS_LEN];
+    char choice[8], input_nick[MAX_NICK_LEN], pass[MAX_PASS_LEN];
     char buf[MAX_MSG_LEN], msg[MAX_MSG_LEN];
 
     printf(ANSI_BOLD "\n  ╔══════════════════════════╗\n" ANSI_RESET);
-    printf(ANSI_BOLD   "  ║   LABYRINTH  GAME        ║\n" ANSI_RESET);
+    printf(ANSI_BOLD   "  ║      LABYRINTH GAME      ║\n" ANSI_RESET);
     printf(ANSI_BOLD   "  ╚══════════════════════════╝\n\n" ANSI_RESET);
 
     printf("  (1) Registrati   (2) Login  > ");
@@ -537,17 +504,17 @@ int authenticate(void) {
     }
 
     printf("  Nickname: "); fflush(stdout);
-    if (!fgets(nick, sizeof(nick), stdin)) return 0;
-    nick[strcspn(nick, "\n")] = '\0';
+    if (!fgets(input_nick, sizeof(input_nick), stdin)) return 0;
+    input_nick[strcspn(input_nick, "\n")] = '\0';
 
     printf("  Password: "); fflush(stdout);
     if (!fgets(pass, sizeof(pass), stdin)) return 0;
     pass[strcspn(pass, "\n")] = '\0';
 
     if (choice[0] == '1')
-        snprintf(msg, sizeof(msg), "REGISTER %s %s", nick, pass);
+        snprintf(msg, sizeof(msg), "REGISTER %s %s", input_nick, pass);
     else
-        snprintf(msg, sizeof(msg), "LOGIN %s %s", nick, pass);
+        snprintf(msg, sizeof(msg), "LOGIN %s %s", input_nick, pass);
 
     send_line(msg);
     if (recv_line(sock, buf) < 0) return 0;
@@ -556,7 +523,7 @@ int authenticate(void) {
     }
 
     if (choice[0] == '1') {
-        snprintf(msg, sizeof(msg), "LOGIN %s %s", nick, pass);
+        snprintf(msg, sizeof(msg), "LOGIN %s %s", input_nick, pass);
         send_line(msg);
         if (recv_line(sock, buf) < 0) return 0;
         if (strncmp(buf, "OK", 2) != 0) {
@@ -564,7 +531,8 @@ int authenticate(void) {
         }
     }
 
-    printf(ANSI_GREEN ANSI_BOLD "\n  Benvenuto, %s!\n" ANSI_RESET, nick);
+    printf(ANSI_GREEN ANSI_BOLD "\n  Benvenuto, %s!\n" ANSI_RESET, input_nick);
+    snprintf(nick, sizeof(nick), "%s", input_nick);
     fflush(stdout);
     sleep(1);
     return 1;
@@ -572,7 +540,7 @@ int authenticate(void) {
 
 void game_loop(void) {
     char line[MAX_MSG_LEN];
-    int  running = 1;
+    int running = 1;
 
     display_lobby(0, 0);
 
@@ -592,7 +560,6 @@ void game_loop(void) {
 
         if (ready == 0) {
             if (!in_lobby && time_remaining > 0) {
-                time_remaining--;
                 print_timer();
             }
             continue;
@@ -633,14 +600,13 @@ void game_loop(void) {
                             send_line("READY");
                             g_ready = 1;
                             show_msg(ANSI_GREEN "  Sei pronto! In attesa degli altri..." ANSI_RESET);
-                        } else {
+                        } else
                             show_msg(ANSI_GRAY "  Hai già dichiarato di essere pronto." ANSI_RESET);
-                        }
                         break;
                     case 'q':
                         send_line("QUIT"); running = 0; break;
                     default:
-                        show_msg(ANSI_GRAY "  Sei in lobby. Premi [r]=pronto o [q]=esci." ANSI_RESET);
+                        show_msg(ANSI_GRAY "  Sei in lobby. Premi [r]eady o [q]uit." ANSI_RESET);
                         break;
                 }
             } else {
@@ -657,7 +623,7 @@ void game_loop(void) {
                     case 'l': send_line("LIST");   break;
                     case 'q': send_line("QUIT"); running = 0; break;
                     default:
-                        show_msg(ANSI_GRAY "  Comando non riconosciuto. Usa w/a/s/d, l=lista, q=esci" ANSI_RESET);
+                        show_msg(ANSI_GRAY "  Comando non riconosciuto. Usa w/a/s/d, [l]ista, [q]uit" ANSI_RESET);
                         break;
                 }
             }
@@ -713,14 +679,19 @@ int main(int argc, char *argv[]) {
 
     game_loop();
 
+    if (timer_exists) {
+        pthread_cancel(tid_timer);
+        pthread_join(tid_timer, NULL);
+    }
+
     disable_raw_mode();
     printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
     fflush(stdout);
 
-    if (game_end_msg[0] != '\0') {
-        printf("%s\n", game_end_msg);
-        fflush(stdout);
-    }
+    snprintf(game_end_msg + strlen(game_end_msg), sizeof(game_end_msg), "%s\n",
+                ANSI_MAGENTA ANSI_BOLD "\n  Arrivederci!" ANSI_RESET);
+    printf("%s\n", game_end_msg);
+    fflush(stdout);
 
     close(sock);
     return 0;

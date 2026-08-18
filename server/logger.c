@@ -37,7 +37,7 @@ void log_write(const char *fmt, ...) {
     pthread_mutex_unlock(&log_mutex);
 }
 
-void log_close(void) { //TODO mutex?
+void log_close(void) {
     pthread_mutex_lock(&log_mutex);
     if (log_fp) {
         log_write("=== server stopped ===");
