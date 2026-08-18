@@ -423,7 +423,7 @@ void phase_play(int fd, int player_idx, const char* nick) {
 
     time_t last_global = time(NULL);
 
-    while (1) {
+    while (1) {//TODO
         pthread_mutex_lock(&mutex);
         int over = game_over;
         pthread_mutex_unlock(&mutex);
@@ -480,10 +480,11 @@ void phase_play(int fd, int player_idx, const char* nick) {
     }
 }
 
-void client_cleanup(int fd, int player_idx, int player_ready, const char* nick) {
+void client_cleanup(int player_idx, int* player_ready) {
     if (player_idx >= 0) {
         pthread_mutex_lock(&mutex);
-        if (player_ready) pt.ready_count--;
+        if (*player_ready) pt.ready_count--;
+        *player_ready = 0;
         client_fds[player_idx] = -1;
         player_remove(&pt, player_idx);
         broadcast_lobby_update();
@@ -498,10 +499,7 @@ void client_cleanup(int fd, int player_idx, int player_ready, const char* nick) 
         pthread_mutex_unlock(&mutex);
 
         write(notify_pipe[1], "\x01", 1);
-        log_write("DISCONNECT nick=%s", nick);
     }
-
-    close(fd);
 }
 
 void* handle_client(void* arg) {
@@ -527,7 +525,27 @@ void* handle_client(void* arg) {
         }
     }
 
-    client_cleanup(fd, player_idx, player_ready, nick);
+    while (1) {
+        char buf[MAX_MSG_LEN];
+        client_cleanup(player_idx, &player_ready);
+        if (recv_line(fd, buf) < 0) {
+            close(fd); return NULL;
+        }
+        if (strcmp(buf, "AGAIN") == 0) {
+            player_idx = phase_join(fd, nick);
+
+            if (player_idx >= 0) {
+                if (phase_lobby(fd, &player_ready)) {
+                    if (phase_wait_start(fd)) {
+                        phase_play(fd, player_idx, nick);
+                    }
+                }
+            }
+        } else break;
+    }
+
+    log_write("DISCONNECT nick=%s", nick);
+    close(fd);
     return NULL;
 }
 

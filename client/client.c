@@ -49,17 +49,19 @@
 
 #define MAP_START_ROW  5
 
-int sock     = -1;
+int sock = -1;
+char nick[MAX_NICK_LEN] = {0};
+
 int score    = 0;
 int exited   = 0;
 int in_lobby = 1;
 int g_ready  = 0;
-char nick[MAX_NICK_LEN] = {0};
-pthread_t tid_timer;
-int timer_exists = 0;
 
+pthread_t tid_timer;
+int timer_exists   = 0;
 int time_remaining = GAME_TIMEOUT;
-char persist_msg[MAX_MSG_LEN] = {0};
+
+char persist_msg[MAX_MSG_LEN]    = {0};
 char game_end_msg[MAX_MSG_LEN*2] = {0};
 
 // Per memorizzare la mappa locale per il posizionamento a sinistra
@@ -489,46 +491,50 @@ int authenticate(void) {
     printf(ANSI_BOLD "\n  ╔══════════════════════════╗\n" ANSI_RESET);
     printf(ANSI_BOLD   "  ║      LABYRINTH GAME      ║\n" ANSI_RESET);
     printf(ANSI_BOLD   "  ╚══════════════════════════╝\n\n" ANSI_RESET);
-
-    printf("  (1) Registrati   (2) Login  > ");
     fflush(stdout);
+
     while (1) {
+        printf("  (1) Registrati   (2) Login   (0) Esci  > ");
         if (!fgets(choice, sizeof(choice), stdin)) return 0;
         choice[strcspn(choice, "\n")] = '\0';
 
-        if (strcmp(choice, "1") == 0 || strcmp(choice, "2") == 0) break;
+        if (strcmp(choice, "0") == 0) return 0;
+        if (strcmp(choice, "1") != 0 && strcmp(choice, "2") != 0) {
+            printf(ANSI_RED "  Opzione non valida, inserisci 1, 2 o 0\n" ANSI_RESET);
+            fflush(stdout);
+            continue;
+        }
 
-        printf(ANSI_RED "  Opzione non valida, inserisci 1 o 2\n" ANSI_RESET);
-        printf("  (1) Registrati   (2) Login  > ");
-        fflush(stdout);
-    }
+        printf("\n  Nickname: "); fflush(stdout);
+        if (!fgets(input_nick, sizeof(input_nick), stdin)) return 0;
+        input_nick[strcspn(input_nick, "\n")] = '\0';
 
-    printf("  Nickname: "); fflush(stdout);
-    if (!fgets(input_nick, sizeof(input_nick), stdin)) return 0;
-    input_nick[strcspn(input_nick, "\n")] = '\0';
+        printf("  Password: "); fflush(stdout);
+        if (!fgets(pass, sizeof(pass), stdin)) return 0;
+        pass[strcspn(pass, "\n")] = '\0';
 
-    printf("  Password: "); fflush(stdout);
-    if (!fgets(pass, sizeof(pass), stdin)) return 0;
-    pass[strcspn(pass, "\n")] = '\0';
+        if (choice[0] == '1')
+            snprintf(msg, sizeof(msg), "REGISTER %s %s", input_nick, pass);
+        else
+            snprintf(msg, sizeof(msg), "LOGIN %s %s", input_nick, pass);
 
-    if (choice[0] == '1')
-        snprintf(msg, sizeof(msg), "REGISTER %s %s", input_nick, pass);
-    else
-        snprintf(msg, sizeof(msg), "LOGIN %s %s", input_nick, pass);
-
-    send_line(msg);
-    if (recv_line(sock, buf) < 0) return 0;
-    if (strncmp(buf, "OK", 2) != 0) {
-        printf(ANSI_RED "  Errore: %s\n" ANSI_RESET, buf); return 0;
-    }
-
-    if (choice[0] == '1') {
-        snprintf(msg, sizeof(msg), "LOGIN %s %s", input_nick, pass);
         send_line(msg);
         if (recv_line(sock, buf) < 0) return 0;
         if (strncmp(buf, "OK", 2) != 0) {
-            printf(ANSI_RED "  Login fallito: %s\n" ANSI_RESET, buf); return 0;
+            printf(ANSI_RED "  Errore: %s\n" ANSI_RESET, buf);
+            continue;
         }
+
+        if (choice[0] == '1') {
+            snprintf(msg, sizeof(msg), "LOGIN %s %s", input_nick, pass);
+            send_line(msg);
+            if (recv_line(sock, buf) < 0) return 0;
+            if (strncmp(buf, "OK", 2) != 0) {
+                printf(ANSI_RED "  Login fallito: %s\n" ANSI_RESET, buf);
+                continue;
+            }
+        }
+        break;
     }
 
     printf(ANSI_GREEN ANSI_BOLD "\n  Benvenuto, %s!\n" ANSI_RESET, input_nick);
@@ -604,7 +610,7 @@ void game_loop(void) {
                             show_msg(ANSI_GRAY "  Hai già dichiarato di essere pronto." ANSI_RESET);
                         break;
                     case 'q':
-                        send_line("QUIT"); running = 0; break;
+                        send_line("QUIT"); running = 0; recv_line(sock, line); break;
                     default:
                         show_msg(ANSI_GRAY "  Sei in lobby. Premi [r]eady o [q]uit." ANSI_RESET);
                         break;
@@ -621,7 +627,7 @@ void game_loop(void) {
                     case 's': send_line("MOVE S"); break;
                     case 'd': send_line("MOVE E"); break;
                     case 'l': send_line("LIST");   break;
-                    case 'q': send_line("QUIT"); running = 0; break;
+                    case 'q': send_line("QUIT"); running = 0; recv_line(sock, line); break;
                     default:
                         show_msg(ANSI_GRAY "  Comando non riconosciuto. Usa w/a/s/d, [l]ista, [q]uit" ANSI_RESET);
                         break;
@@ -629,13 +635,6 @@ void game_loop(void) {
             }
         }
     }
-}
-
-void cleanup_terminal(int sig) {
-    disable_raw_mode();
-    printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
-    fflush(stdout);
-    exit(sig);
 }
 
 int main(int argc, char *argv[]) {
@@ -665,34 +664,73 @@ int main(int argc, char *argv[]) {
         perror("connect"); return 1;
     }
 
-    printf(ANSI_CYAN "  Connesso a %s:%d\n" ANSI_RESET, host, port);
+    printf(ANSI_CYAN "\n  Connesso a %s:%d\n" ANSI_RESET, host, port);
 
-    if (!authenticate()) { close(sock); return 1; }
+    signal(SIGINT,  SIG_IGN);
+    signal(SIGTERM, SIG_IGN);
 
-    signal(SIGINT,  cleanup_terminal);
-    signal(SIGTERM, cleanup_terminal);
-
-    printf(ANSI_ALT_SCREEN_ON ANSI_CURSOR_HIDE);
-    fflush(stdout);
-
-    enable_raw_mode();
-
-    game_loop();
-
-    if (timer_exists) {
-        pthread_cancel(tid_timer);
-        pthread_join(tid_timer, NULL);
+    if (!authenticate()) {
+        printf(ANSI_BOLD ANSI_MAGENTA "\n  Arrivederci!\n\n" ANSI_RESET);
+        close(sock);
+        fflush(stdout);
+        return 1;
     }
 
-    disable_raw_mode();
-    printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
-    fflush(stdout);
+    while (1) {
+        printf(ANSI_ALT_SCREEN_ON ANSI_CURSOR_HIDE);
+        fflush(stdout);
 
-    snprintf(game_end_msg + strlen(game_end_msg), sizeof(game_end_msg), "%s\n",
-                ANSI_MAGENTA ANSI_BOLD "\n  Arrivederci!" ANSI_RESET);
-    printf("%s\n", game_end_msg);
-    fflush(stdout);
+        enable_raw_mode();
 
-    close(sock);
+        game_loop();
+
+        if (timer_exists) {
+            pthread_cancel(tid_timer);
+            pthread_join(tid_timer, NULL);
+        }
+
+        disable_raw_mode();
+        printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
+        fflush(stdout);
+
+        printf("%s\n", game_end_msg);
+        fflush(stdout);
+
+        char choice[8];        
+        while (1) {
+            printf("  Vuoi rigiocare?  (1) Sì  (2) No  > ");
+            if (!fgets(choice, sizeof(choice), stdin)) return 0;
+            choice[strcspn(choice, "\n")] = '\0';
+
+            if (strcmp(choice, "1") != 0 && strcmp(choice, "2") != 0) {
+                printf(ANSI_RED "  Opzione non valida, inserisci 1 o 2\n" ANSI_RESET);
+                fflush(stdout);
+                continue;
+            }
+            break;
+        }
+        if (choice[0] == '2') {
+            printf(ANSI_BOLD ANSI_MAGENTA "\n  Arrivederci!\n\n" ANSI_RESET);
+            close(sock);
+            return 0;
+        }
+
+        score    = 0;
+        exited   = 0;
+        in_lobby = 1;
+        g_ready  = 0;
+        timer_exists = 0;
+
+        time_remaining = GAME_TIMEOUT;
+        memset(persist_msg, 0, sizeof(persist_msg));
+        memset(game_end_msg, 0, sizeof(game_end_msg));
+
+        memset(local_data, 0, sizeof(local_data));
+        local_rows = 0, local_cols = 0;
+        memset(global_data, 0, sizeof(global_data));
+        global_rows = 0, global_cols = 0;
+        send_line("AGAIN");
+    }
+
     return 0;
 }
