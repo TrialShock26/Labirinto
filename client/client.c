@@ -421,7 +421,7 @@ int handle_server_msg(const char *line) {
     }
 
     /* uscita */
-    
+
     if (strcmp(cmd, "EXIT_OK") == 0) {
         sscanf(line, "EXIT_OK %d", &score);
         show_msg_persist(ANSI_GREEN ANSI_BOLD "  ✓ Uscita! Punteggio: %d — attendi risultato..." ANSI_RESET, score);
@@ -649,7 +649,7 @@ int main(int argc, char *argv[]) {
     setlocale(LC_ALL, "");
 
     struct hostent *he = gethostbyname(host);
-    if (!he) { herror("gethostbyname"); return 1; }
+    if (!he) { perror("gethostbyname"); return 1; }
 
     sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) { perror("socket"); return 1; }
@@ -696,7 +696,7 @@ int main(int argc, char *argv[]) {
         printf("%s\n", game_end_msg);
         fflush(stdout);
 
-        char choice[8];        
+        char choice[8];
         while (1) {
             printf("  Vuoi rigiocare?  (1) Sì  (2) No  > ");
             if (!fgets(choice, sizeof(choice), stdin)) return 0;

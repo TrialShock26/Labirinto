@@ -11,7 +11,7 @@
 typedef struct {
     char cell;  // CELL_FREE - CELL_WALL - CELL_EXIT - CELL_OBJECT
 } MazeCell;
- 
+
 typedef struct {
     MazeCell grid[MAZE_ROWS][MAZE_COLS];
     int      num_objects;       // oggetti ancora presenti

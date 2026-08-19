@@ -554,7 +554,7 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "uso: %s <porta>\n", argv[0]);
         return 1;
     }
-    
+
     maze_generate(&maze);
     log_write("maze generated (%dx%d)", MAZE_ROWS, MAZE_COLS);
 
