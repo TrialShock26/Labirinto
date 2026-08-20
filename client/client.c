@@ -198,13 +198,16 @@ void redraw_maps(void) {
            "   " ANSI_CYAN "%s" ANSI_RESET
            "   punteggio: " ANSI_YELLOW ANSI_BOLD "%d" ANSI_RESET "\n", nick, score);
 
-    /* bordo superiore */
     printf("  +");
     for (int c = 0; c < local_cols; c++) printf("--");
     printf("+");
-    printf("     +");
-    for (int c = 0; c < global_cols; c++) printf("--");
-    printf("+\n");
+    if (global_cols > 0) {
+        printf("     +");
+        for (int c = 0; c < global_cols; c++) printf("--");
+        printf("+\n");
+    } else {
+        printf("\n");
+    }
 
     int max_rows = global_rows > local_rows ? global_rows : local_rows;
     int local_done  = 0;
@@ -240,32 +243,34 @@ void redraw_maps(void) {
             printf("|     ");
         }
 
-        /* --- lato destro: mappa globale --- */
-        if (!global_done && r == global_rows) {
-            /* chiudi il bordo globale */
-            printf("+");
-            for (int c = 0; c < global_cols; c++) printf("--");
-            printf("+");
-            global_done = 1;
-        } else if (global_done) {
-            /* spazio vuoto dove la globale è già finita */
-            int global_width = global_cols * 2 + 2;
-            for (int i = 0; i < global_width; i++) printf(" ");
-        } else {
-            printf("|");
-            for (int c = 0; c < global_cols; c++) {
-                char ch = global_data[r * global_cols + c];
-                switch (ch) {
-                    case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
-                    case CELL_FREE:    printf("  ");                                                            break;
-                    case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                 break;
-                    case CELL_EXIT:    printf(ANSI_BG_GREEN "  " ANSI_RESET);                                   break;
-                    case CELL_UNKNOWN: printf(" " SYM_UNKNOWN);                                                 break;
-                    case CELL_PLAYER:  printf(" " SYM_PLAYER);                                                  break;
-                    default:           printf(" %c", ch);                                                       break;
+        if(global_cols > 0){
+            /* --- lato destro: mappa globale --- */
+            if (!global_done && r == global_rows) {
+                /* chiudi il bordo globale */
+                printf("+");
+                for (int c = 0; c < global_cols; c++) printf("--");
+                printf("+");
+                global_done = 1;
+            } else if (global_done) {
+                /* spazio vuoto dove la globale è già finita */
+                int global_width = global_cols * 2 + 2;
+                for (int i = 0; i < global_width; i++) printf(" ");
+            } else {
+                printf("|");
+                for (int c = 0; c < global_cols; c++) {
+                    char ch = global_data[r * global_cols + c];
+                    switch (ch) {
+                        case CELL_WALL:    printf(" " SYM_WALL);                                                    break;
+                        case CELL_FREE:    printf("  ");                                                            break;
+                        case CELL_OBJECT:  printf(ANSI_YELLOW ANSI_BOLD " " SYM_OBJECT ANSI_RESET);                 break;
+                        case CELL_EXIT:    printf(ANSI_BG_GREEN "  " ANSI_RESET);                                   break;
+                        case CELL_UNKNOWN: printf(" " SYM_UNKNOWN);                                                 break;
+                        case CELL_PLAYER:  printf(" " SYM_PLAYER);                                                  break;
+                        default:           printf(" %c", ch);                                                       break;
+                    }
                 }
+                printf("|");
             }
-            printf("|");
         }
 
         printf("\n");
@@ -280,7 +285,7 @@ void redraw_maps(void) {
         for (int i = 0; i < local_width + 5; i++) printf(" ");
     }
 
-    if (!global_done) {
+    if (global_cols > 0 && !global_done) {
         printf("+");
         for (int c = 0; c < global_cols; c++) printf("--");
         printf("+\n");
@@ -573,8 +578,10 @@ void game_loop(void) {
 
         if (FD_ISSET(sock, &fds)) {
             if (recv_line(sock, line) < 0) {
-                printf(ANSI_RED "\n  Connessione chiusa dal server.\n" ANSI_RESET);
-                break;
+                disable_raw_mode();
+                printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
+                printf(ANSI_RED "\n  Connessione chiusa dal server.\n\n" ANSI_RESET);
+                exit(-1);
             }
             running = handle_server_msg(line);
             if (!running) break;
@@ -667,7 +674,7 @@ int main(int argc, char *argv[]) {
     printf(ANSI_CYAN "\n  Connesso a %s:%d\n" ANSI_RESET, host, port);
 
     signal(SIGINT,  SIG_IGN);
-    signal(SIGTERM, SIG_IGN);
+    signal(SIGPIPE, SIG_IGN);
 
     if (!authenticate()) {
         printf(ANSI_BOLD ANSI_MAGENTA "\n  Arrivederci!\n\n" ANSI_RESET);

@@ -26,7 +26,7 @@ pthread_mutex_t auth_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t all_end = PTHREAD_COND_INITIALIZER;
 int all_done = 0;
 int notify_pipe[2] = {-1, -1};
-volatile int game_over = 0; //TODO se funziona togliendo volatile
+int game_over = 0;
 int client_fds[MAX_PLAYERS];
 int listen_sd = -1;
 

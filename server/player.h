@@ -12,7 +12,7 @@ typedef struct {
   int  row, col;                      // posizione corrente
   int  score;                         // oggetti raccolti
   int  exited;
-  char discovered[MAZE_ROWS][MAZE_COLS];
+  int discovered[MAZE_ROWS][MAZE_COLS];
 } Player;
 
 typedef struct {
