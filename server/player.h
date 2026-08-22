@@ -4,6 +4,7 @@
 #include <pthread.h>
 
 #include "../common/protocol.h"
+#include "maze.h"
 
 typedef struct {
   int  active;                        // 1 = slot occupato
@@ -32,10 +33,10 @@ void player_reveal(Player *p, int row, int col);
 
 /* Costruisce la stringa della mappa locale (finestra centrata sul giocatore)
    buf deve essere almeno (2*VIEW_RADIUS+1)^2 + 1 byte */
-void player_local_map(const Player *p, const char maze_grid[][MAZE_COLS], char *buf);
+void player_local_map(const Player *p, const Maze* maze, char *buf);
 
 /* Costruisce la stringa della mappa globale mascherata
    buf deve essere almeno MAZE_ROWS*MAZE_COLS + 1 byte */
-void player_global_map(const Player *p, const char maze_grid[][MAZE_COLS], char *buf);
+void player_global_map(const Player *p, const Maze* maze, char *buf);
 
 #endif

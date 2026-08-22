@@ -16,8 +16,6 @@ GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
                           char *winner_nick, int *winner_score, int *draw);
 
 // Costruisce il messaggio GAME_END da inviare al client
-void game_build_end_msg(GameStatus status,
-                        const char *winner_nick, int winner_score, int draw,
-                        char *buf);
+void game_build_end_msg(const char *winner_nick, int winner_score, int draw, char *buf);
 
 #endif

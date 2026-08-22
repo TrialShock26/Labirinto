@@ -60,11 +60,11 @@ GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
         }
     }
 
-    /* --- condizione: tutti hanno quittato --- */
-    if (exited_count == 0 && ingame_count == 0) {
-        *winner_score = -1;
-        return GAME_OVER_TIMEOUT;
-    }
+    // /* --- condizione: tutti hanno quittato --- */
+    // if (exited_count == 0 && ingame_count == 0) {
+    //     *winner_score = -1;
+    //     return GAME_OVER_TIMEOUT;
+    // }
 
     /* --- condizione: tutti i giocatori attivi sono usciti --- */
     if (ingame_count == 0 && exited_count >= 1) {
@@ -107,11 +107,7 @@ GameStatus game_check_end(const Maze *maze, const PlayerTable *pt,
     return GAME_RUNNING;
 }
 
-void game_build_end_msg(GameStatus status, const char *winner_nick, int winner_score, int draw, char *buf) {
-    if (status == GAME_OVER_TIMEOUT && winner_score < 0) {
-        snprintf(buf, MAX_MSG_LEN, "GAME_END TIMEOUT");
-        return;
-    }
+void game_build_end_msg(const char *winner_nick, int winner_score, int draw, char *buf) {
     if (draw)
         snprintf(buf, MAX_MSG_LEN, "GAME_END DRAW %d", winner_score);
     else

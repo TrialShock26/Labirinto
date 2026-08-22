@@ -44,7 +44,6 @@
 #define SYM_PLAYER   "\xe1\x8c\xb8"
 #define SYM_WALL     "\xf0\x91\x80\xa9"
 #define SYM_OBJECT   "@"
-#define SYM_EXIT     "E"
 #define SYM_UNKNOWN  "?"
 
 #define MAP_START_ROW  5
@@ -581,6 +580,7 @@ void game_loop(void) {
                 disable_raw_mode();
                 printf(ANSI_ALT_SCREEN_OFF ANSI_CURSOR_SHOW);
                 printf(ANSI_RED "\n  Connessione chiusa dal server.\n\n" ANSI_RESET);
+                close(sock);
                 exit(-1);
             }
             running = handle_server_msg(line);

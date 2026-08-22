@@ -26,7 +26,6 @@ pthread_mutex_t auth_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t all_end = PTHREAD_COND_INITIALIZER;
 int all_done = 0;
 int notify_pipe[2] = {-1, -1};
-int game_over = 0;
 int client_fds[MAX_PLAYERS];
 int listen_sd = -1;
 
@@ -136,11 +135,7 @@ void send_local_map(int fd, Player* p) {
     char data[((2*VIEW_RADIUS+1)*(2*VIEW_RADIUS+1)) + 1];
     int rows = 2*VIEW_RADIUS + 1;
     int cols = rows;
-    char flat[MAZE_ROWS][MAZE_COLS];
-    for (int r = 0; r < MAZE_ROWS; r++)
-        for (int c = 0; c < MAZE_COLS; c++)
-            flat[r][c] = maze.grid[r][c].cell;
-    player_local_map(p, flat, data);
+    player_local_map(p, &maze, data);
     char msg[MAX_MSG_LEN];
     snprintf(msg, sizeof(msg), "LOCAL %d %d %s", rows, cols, data);
     send_line(fd, msg);
@@ -148,11 +143,7 @@ void send_local_map(int fd, Player* p) {
 
 void send_global_map(int fd, Player* p) {
     char data[MAZE_ROWS*MAZE_COLS + 1];
-    char flat[MAZE_ROWS][MAZE_COLS];
-    for (int r = 0; r < MAZE_ROWS; r++)
-        for (int c = 0; c < MAZE_COLS; c++)
-            flat[r][c] = maze.grid[r][c].cell;
-    player_global_map(p, flat, data);
+    player_global_map(p, &maze, data);
     char msg[MAX_MSG_LEN + MAZE_ROWS*MAZE_COLS];
     snprintf(msg, sizeof(msg), "GLOBAL %d %d %s", MAZE_ROWS, MAZE_COLS, data);
     send_line(fd, msg);
@@ -336,6 +327,7 @@ int handle_move_command(int fd, const char* line, int player_idx, const char* ni
         snprintf(msg, sizeof(msg), "EXIT_OK %d", p->score);
         send_line(fd, msg);
         log_write("EXIT nick=%s score=%d", nick, p->score);
+        write(notify_pipe[1], "\x01", 1);
         pthread_mutex_unlock(&mutex);
         return 2;
     }
@@ -397,9 +389,8 @@ int check_and_handle_game_end(int fd, const char* nick) {
     pthread_mutex_lock(&mutex);
     GameStatus status = game_check_end(&maze, &pt, winner, &winner_score, &is_draw);
     if (status != GAME_RUNNING) {
-        game_over = 1;
         char end_msg[MAX_MSG_LEN];
-        game_build_end_msg(status, winner, winner_score, is_draw, end_msg);
+        game_build_end_msg(winner, winner_score, is_draw, end_msg);
         send_line(fd, end_msg);
         log_write("GAME_END nick=%s msg=%s", nick, end_msg);
 
@@ -423,15 +414,7 @@ void phase_play(int fd, int player_idx, const char* nick) {
 
     time_t last_global = time(NULL);
 
-    while (1) {//TODO
-        pthread_mutex_lock(&mutex);
-        int over = game_over;
-        pthread_mutex_unlock(&mutex);
-        if (over) {
-            check_and_handle_game_end(fd, nick);
-            return;
-        }
-
+    while (1) {
         if (check_and_handle_game_end(fd, nick)) return;
 
         time_t now = time(NULL);
@@ -491,7 +474,6 @@ void client_cleanup(int player_idx, int* player_ready) {
         if (pt.count == 0) {
             pt.ready_count = 0;
             maze.game_started = 0;
-            game_over = 0;
             all_done = 0;
             maze_generate(&maze);
             log_write("maze regenerated (%dx%d)", MAZE_ROWS, MAZE_COLS);

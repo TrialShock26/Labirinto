@@ -16,7 +16,7 @@
 
 // Parametri di gioco
 #define GLOBAL_MAP_INTERVAL 10  // Secondi tra un invio della mappa globale e il prossimo
-#define GAME_TIMEOUT        30  // Durata massima partita
+#define GAME_TIMEOUT        90  // Durata massima partita
 #define MAX_PLAYERS         10
 #define MAX_NICK_LEN        32
 #define MAX_PASS_LEN        32
